@@ -1,0 +1,31 @@
+{
+	"name": "ajax-interceptor",
+	"version": "1.0.0",
+	"description": "A plugin for intercepting and modifying AJAX requests",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "rollup -c"
+	},
+	"author": "arktomson",
+	"license": "MIT",
+	"keywords": [
+		"ajax",
+		"interceptor"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Arktomson/ajaxInterceptor.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Arktomson/ajaxInterceptor/issues"
+	},
+	"devDependencies": {
+		"rollup": "^4.52.2",
+		"rollup-plugin-define": "^1.0.1",
+		"rollup-plugin-typescript2": "^0.36.0",
+		"typescript": "^5.7.3"
+
+	},
+	"dependencies": {
+	}
+}
