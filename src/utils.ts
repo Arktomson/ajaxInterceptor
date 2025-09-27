@@ -1,0 +1,1 @@
+export const getDescriptor = Object.getOwnPropertyDescriptor.bind(Object);
