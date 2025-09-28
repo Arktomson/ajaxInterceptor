@@ -1,4 +1,4 @@
-import { AJAX_TYPE } from "./constant";
+import { AJAX_TYPE } from './constant';
 
 export interface AjaxResponse {
   status: number;
@@ -12,14 +12,21 @@ export interface AjaxResponse {
     | ReadableStream;
   responseText: string;
   responseXML: string;
+  responseType: string;
+}
 
+export interface FetchResponse
+  extends Pick<
+    Response,
+    'ok' | 'status' | 'statusText' | 'headers' | 'url' | 'redirected'
+  > {
 }
 export interface AjaxHookerRequest {
   type: keyof typeof AJAX_TYPE;
   method: string;
   url: string | URL;
   headers: Record<string, string>;
-  async: boolean;
+  async?: boolean;
   body:
     | string
     | Record<string, any>
