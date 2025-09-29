@@ -1,6 +1,6 @@
-import { CYCLE_SCHEDULER } from './constant';
-import { AjaxHookerRequest, AjaxResponse } from './type';
-
+import { AJAX_TYPE, CYCLE_SCHEDULER } from './constant';
+import { AjaxInterceptorRequest, AjaxResponse } from './type';
+import { mapValues } from 'lodash-es';
 class XhrInterceptor {
   public readonly nativeXhr = window.XMLHttpRequest;
   public readonly nativeXhrPrototype = this.nativeXhr.prototype;
@@ -53,6 +53,7 @@ class XhrInterceptor {
       return async function (body: Parameters<XMLHttpRequest['send']>) {
         const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
+        hooker.request.headers = mapValues(hooker.xhrSetRequestAfterOpen, (val) => val.join(','))
         const oldRequest = Object.assign({}, hooker.request);
         await hooker.execute(hooker.request, self.hooks);
 
@@ -67,8 +68,8 @@ class XhrInterceptor {
             hooker.request.async,
             ...(hooker.xhrOpenRestArgs || []),
           ]);
-          for (let [key, val] of hooker.xhrSetRequestAfterOpen) {
-            target.setRequestHeader(key, val.join(','));
+          for (let [key, val] of Object.entries(hooker.request.headers)) {
+            target.setRequestHeader(key, val);
           }
         }
 
@@ -82,9 +83,9 @@ class XhrInterceptor {
         self.nativeXhrPrototype.setRequestHeader.call(target, name, value);
 
         const key = name.toLowerCase();
-        const headers = hooker.xhrSetRequestAfterOpen.get(key) ?? [];
+        const headers = hooker.xhrSetRequestAfterOpen[key] ?? [];
         headers.push(value);
-        hooker.xhrSetRequestAfterOpen.set(key, headers);
+        hooker.xhrSetRequestAfterOpen[key] = headers;
       };
     },
   };
@@ -182,25 +183,25 @@ class FetchInterceptor {
   }
   _generateProxyFetch() {
     const self = this;
-    async function proxyFetch(url: string, options: RequestInit) {
+    async function proxyFetch(url: string, options: RequestInit = {}) {
       const winFetch = self.nativeFetch;
       const hooker = new CycleScheduler();
       const newRequest = await hooker.execute(
         {
-          type: 'FETCH',
+          type: AJAX_TYPE.FETCH,
           url,
-          method: options.method || 'GET',
-          headers: (options.headers || {}) as Record<string, string>,
-          body: options.body || null,
+          method: options.method,
+          headers: options.headers as Record<string, string>,
+          body: options.body,
           response: () => {},
         },
         self.hooks
       );
       const fh: Response = await winFetch(newRequest.url, {
         ...options,
-        headers: newRequest.headers,
-        body: newRequest.body as BodyInit,
-        method: newRequest.method,
+        ...(newRequest.headers ? { headers: newRequest.headers } : {}),
+        ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
+        ...(newRequest.method ? { method: newRequest.method } : {}),
       });
       fh[CYCLE_SCHEDULER] = hooker;
       const proxyFh = new Proxy(fh, {
@@ -226,27 +227,27 @@ class FetchInterceptor {
   }
 }
 class CycleScheduler {
-  public request: AjaxHookerRequest = {} as AjaxHookerRequest;
+  public request: AjaxInterceptorRequest = {} as AjaxInterceptorRequest;
   public resp: AjaxResponse = {} as AjaxResponse;
   public xhrOpenRestArgs: (string | boolean | URL)[] = [];
-  public xhrSetRequestAfterOpen = new Map<string, string[]>();
+  public xhrSetRequestAfterOpen: Record<string, string[]> = {};
   public xhrAlreadyReturned = false;
   constructor({
-    request = {} as AjaxHookerRequest,
+    request = {} as AjaxInterceptorRequest,
   }: {
-    request?: AjaxHookerRequest;
+    request?: AjaxInterceptorRequest;
   } = {}) {
     this.request = request;
   }
   reset() {
-    this.request = {} as AjaxHookerRequest;
+    this.request = {} as AjaxInterceptorRequest;
     this.resp = {} as AjaxResponse;
     this.xhrOpenRestArgs = [];
-    this.xhrSetRequestAfterOpen.clear();
+    this.xhrSetRequestAfterOpen = {}
     this.xhrAlreadyReturned = false;
   }
 
-  async execute(request: AjaxHookerRequest, fnList: Function[]) {
+  async execute(request: AjaxInterceptorRequest, fnList: Function[]) {
     let result = request;
     for (const fn of fnList) {
       const newResult = await fn(result);
@@ -299,16 +300,18 @@ class AjaxInterceptor {
 
 const ajaxInterceptor: AjaxInterceptor = AjaxInterceptor.getInstance();
 ajaxInterceptor.inject();
-ajaxInterceptor.hook((request: AjaxHookerRequest) => {
-  console.log('hook', request.url);
+let count = 0;
+ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
+  console.log(`%c${++count} twices-find9`, 'color: red', request.url);
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';
     request.body = JSON.stringify(body);
   }
+  
   if (
     request.type === 'FETCH' &&
-    request.url.includes('/admin/article/paging')
+    (typeof request.url === 'string' && request.url.includes('/admin/article/paging'))
   ) {
     console.log(request.body, 'request.body');
     const body = JSON.parse(request.body);

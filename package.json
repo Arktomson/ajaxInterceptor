@@ -6,7 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "rollup -c",
-		"onbuild": "rollup -c -w"
+		"start": "rollup -c -w"
 	},
 	"author": "arktomson",
 	"license": "MIT",
@@ -22,11 +22,15 @@
 		"url": "https://github.com/Arktomson/ajaxInterceptor/issues"
 	},
 	"devDependencies": {
+		"@rollup/plugin-node-resolve": "^16.0.1",
 		"@rollup/plugin-typescript": "^11.1.6",
+		"@types/lodash-es": "^4.17.12",
 		"rollup": "^4.52.2",
 		"rollup-plugin-cleaner": "^1.0.0",
 		"rollup-plugin-clear": "^2.0.7",
 		"rollup-plugin-define": "^1.0.1",
+		"rollup-plugin-livereload": "^2.0.5",
+		"rollup-plugin-serve": "^3.0.0",
 		"typescript": "^5.7.3"
 	},
 	"dependencies": {
