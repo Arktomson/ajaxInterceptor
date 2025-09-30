@@ -1,8 +1,22 @@
 import { AJAX_TYPE } from './constant';
 
-export interface AjaxResponse {
+type TypedArray =
+  | Int8Array
+  | Uint8Array
+  | Uint8ClampedArray
+  | Int16Array
+  | Uint16Array
+  | Int32Array
+  | Uint32Array
+  | Float32Array
+  | Float64Array
+  | BigInt64Array
+  | BigUint64Array;
+interface BaseResponse {
   status: number;
   statusText: string;
+}
+export interface XhrResponse {
   response:
     | string
     | number
@@ -18,9 +32,23 @@ export interface AjaxResponse {
 export interface FetchResponse
   extends Pick<
     Response,
-    'ok' | 'status' | 'statusText' | 'headers' | 'url' | 'redirected'
-  > {
+    | 'ok'
+    | 'headers'
+    | 'url'
+    | 'redirected'
+    | 'text'
+    | 'arrayBuffer'
+    | 'blob'
+    | 'formData'
+    | 'json'
+  > {}
+export interface FetchBodyUsed {
+  bodyUsed: boolean;
 }
+export interface AjaxResponse
+  extends BaseResponse,
+    FetchBodyUsed,
+    Partial<XhrResponse & FetchResponse> {}
 export interface AjaxInterceptorRequest {
   type: (typeof AJAX_TYPE)[keyof typeof AJAX_TYPE];
   method: string;
@@ -39,19 +67,5 @@ export interface AjaxInterceptorRequest {
     | File
     | TypedArray
     | null;
-  response: (response: AjaxResponse) => void;
+  response: ((response: AjaxResponse) => void)[];
 }
-interface TypedArray {
-  Int8Array: Int8Array;
-  Uint8Array: Uint8Array;
-  Uint8ClampedArray: Uint8ClampedArray;
-  Int16Array: Int16Array;
-  Uint16Array: Uint16Array;
-  Int32Array: Int32Array;
-  Uint32Array: Uint32Array;
-  Float32Array: Float32Array;
-  Float64Array: Float64Array;
-  BigInt64Array: BigInt64Array;
-  BigUint64Array: BigUint64Array;
-}
-

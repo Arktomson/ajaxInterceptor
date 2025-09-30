@@ -30,7 +30,7 @@ class XhrInterceptor {
     open: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return function (...args: Parameters<XMLHttpRequest['open']>) {
         const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
-        hooker.reset();
+        hooker.xhrReset();
         hooker.request = {
           type: 'XHR',
           method: args[0] || 'GET',
@@ -38,7 +38,7 @@ class XhrInterceptor {
           async: args[2] || true,
           headers: {},
           body: null,
-          response: () => {},
+          response: [],
         };
         hooker.xhrOpenRestArgs = args.slice(3);
         self.nativeXhrPrototype.open.apply(target, [
@@ -53,14 +53,18 @@ class XhrInterceptor {
       return async function (body: Parameters<XMLHttpRequest['send']>) {
         const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
-        hooker.request.headers = mapValues(hooker.xhrSetRequestAfterOpen, (val) => val.join(','))
+        hooker.request.headers = mapValues(
+          hooker.xhrSetRequestAfterOpen,
+          (val) => val.join(',')
+        );
         const oldRequest = Object.assign({}, hooker.request);
-        await hooker.execute(hooker.request, self.hooks);
+        const newRequest = await hooker.execute(hooker.request, self.hooks);
+        hooker.request = newRequest;
 
         if (
-          oldRequest.method !== hooker.request.method ||
-          oldRequest.url !== hooker.request.url ||
-          oldRequest.async !== hooker.request.async
+          oldRequest.method !== newRequest.method ||
+          oldRequest.url !== newRequest.url ||
+          oldRequest.async !== newRequest.async
         ) {
           self.nativeXhrPrototype.open.apply(target, [
             hooker.request.method,
@@ -112,7 +116,7 @@ class XhrInterceptor {
       const xhr = new self.nativeXhr();
       xhr[CYCLE_SCHEDULER] = new CycleScheduler();
 
-      xhr.addEventListener('readystatechange', () => {
+      xhr.addEventListener('readystatechange', async () => {
         if (xhr.readyState === 4) {
           const hooker = xhr[CYCLE_SCHEDULER];
           hooker.xhrAlreadyReturned = true;
@@ -130,7 +134,9 @@ class XhrInterceptor {
                 : null,
             responseType: xhr.responseType,
           };
-          hooker.request.response(hooker.resp);
+          for (let val of hooker.request.response) {
+            await val(hooker.resp);
+          }
         }
       });
       const proxyXhr = new Proxy(xhr, {
@@ -168,6 +174,17 @@ class FetchInterceptor {
   public hooks: Function[] = [];
   static #instance: FetchInterceptor;
   static #token = Symbol('FetchInterceptor');
+  private fetchInstanceAttrHandler = {};
+  private fetchInstanceAttr = [
+    'status',
+    'statusText',
+    'ok',
+    'headers',
+    'url',
+    'redirected',
+  ];
+  private fetchMethodsHandler = {};
+  private fetchMethods = ['json', 'formData', 'blob', 'arrayBuffer', 'text'];
   constructor(token: Symbol) {
     if (token !== FetchInterceptor.#token) {
       throw new Error('FetchInterceptor is a singleton');
@@ -183,6 +200,15 @@ class FetchInterceptor {
   }
   _generateProxyFetch() {
     const self = this;
+    this.fetchInstanceAttrHandler = this.fetchInstanceAttr.map((attr) => {
+      return {
+        name: attr,
+        handler: function (self, target) {
+          const hooker = target[CYCLE_SCHEDULER];
+          return hooker.resp[attr];
+        },
+      };
+    });
     async function proxyFetch(url: string, options: RequestInit = {}) {
       const winFetch = self.nativeFetch;
       const hooker = new CycleScheduler();
@@ -193,16 +219,30 @@ class FetchInterceptor {
           method: options.method,
           headers: options.headers as Record<string, string>,
           body: options.body,
-          response: () => {},
+          response: [],
         },
         self.hooks
       );
+      hooker.request = newRequest;
       const fh: Response = await winFetch(newRequest.url, {
         ...options,
         ...(newRequest.headers ? { headers: newRequest.headers } : {}),
         ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
         ...(newRequest.method ? { method: newRequest.method } : {}),
       });
+
+      hooker.resp = {
+        status: fh.status,
+        statusText: fh.statusText,
+        ok: fh.ok,
+        headers: fh.headers,
+        url: fh.url,
+        redirected: fh.redirected,
+        bodyUsed: hooker.fetchBodyUsed,
+      };
+      for (let val of hooker.request.response) {
+        await val(hooker.resp);
+      }
       fh[CYCLE_SCHEDULER] = hooker;
       const proxyFh = new Proxy(fh, {
         get(target, prop) {
@@ -232,6 +272,7 @@ class CycleScheduler {
   public xhrOpenRestArgs: (string | boolean | URL)[] = [];
   public xhrSetRequestAfterOpen: Record<string, string[]> = {};
   public xhrAlreadyReturned = false;
+  public fetchBodyUsed = false;
   constructor({
     request = {} as AjaxInterceptorRequest,
   }: {
@@ -239,11 +280,11 @@ class CycleScheduler {
   } = {}) {
     this.request = request;
   }
-  reset() {
+  xhrReset() {
     this.request = {} as AjaxInterceptorRequest;
     this.resp = {} as AjaxResponse;
     this.xhrOpenRestArgs = [];
-    this.xhrSetRequestAfterOpen = {}
+    this.xhrSetRequestAfterOpen = {};
     this.xhrAlreadyReturned = false;
   }
 
@@ -302,29 +343,30 @@ const ajaxInterceptor: AjaxInterceptor = AjaxInterceptor.getInstance();
 ajaxInterceptor.inject();
 let count = 0;
 ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
-  console.log(`%c${++count} twices-find9`, 'color: red', request.url);
+  console.log(`%c${++count} twices-x200 ultra`, 'color: red', request.url);
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';
     request.body = JSON.stringify(body);
   }
-  
+
   if (
     request.type === 'FETCH' &&
-    (typeof request.url === 'string' && request.url.includes('/admin/article/paging'))
+    typeof request.url === 'string' &&
+    request.url.includes('/admin/article/paging')
   ) {
     console.log(request.body, 'request.body');
     const body = JSON.parse(request.body);
     body.pageSize = 2;
     request.body = JSON.stringify(body);
   }
-  request.response = (response: AjaxResponse) => {
+  request.response.push((response: AjaxResponse) => {
     if (request.url === '/portal/searchHome') {
       const result = JSON.parse(response.responseText as string);
       result.result.data.children = result.result.data.children.slice(0, 2);
       response.responseText = JSON.stringify(result);
     }
-  };
+  });
   return request;
 });
 
