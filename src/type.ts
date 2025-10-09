@@ -1,4 +1,4 @@
-import { AJAX_TYPE } from './constant';
+import { AJAX_TYPE } from "./constant";
 
 type TypedArray =
   | Int8Array
@@ -25,29 +25,28 @@ export interface XhrResponse {
     | ArrayBuffer
     | ReadableStream;
   responseText: string;
-  responseXML: string;
+  responseXML: Document;
   responseType: string;
 }
 
 export interface FetchResponse
   extends Pick<
     Response,
-    | 'ok'
-    | 'headers'
-    | 'url'
-    | 'redirected'
-    | 'text'
-    | 'arrayBuffer'
-    | 'blob'
-    | 'formData'
-    | 'json'
-  > {}
-export interface FetchBodyUsed {
+    | "ok"
+    | "headers"
+    | "url"
+    | "redirected"
+    | "text"
+    | "arrayBuffer"
+    | "blob"
+    | "formData"
+    | "json"
+  > {
   bodyUsed: boolean;
 }
+
 export interface AjaxResponse
   extends BaseResponse,
-    FetchBodyUsed,
     Partial<XhrResponse & FetchResponse> {}
 export interface AjaxInterceptorRequest {
   type: (typeof AJAX_TYPE)[keyof typeof AJAX_TYPE];

@@ -1,5 +1,5 @@
-import { AJAX_TYPE, CYCLE_SCHEDULER } from './constant';
-import { AjaxInterceptorRequest, AjaxResponse } from './type';
+import { AJAX_TYPE, CYCLE_SCHEDULER } from '../constant';
+import { AjaxInterceptorRequest, AjaxResponse } from '../type';
 import { mapValues } from 'lodash-es';
 class XhrInterceptor {
   public readonly nativeXhr = window.XMLHttpRequest;
@@ -413,48 +413,7 @@ const ajaxInterceptor: AjaxInterceptor = AjaxInterceptor.getInstance();
 ajaxInterceptor.inject();
 let count = 0;
 ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
-  console.log(`%c${++count} twices-x200 ultra`, 'color: red', request.url);
-  if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
-    const body = JSON.parse(request.body as string);
-    body.keyword = '后端';
-    request.body = JSON.stringify(body);
-  }
-
-  if (
-    request.type === 'FETCH' &&
-    typeof request.url === 'string' &&
-    request.url.includes('/admin/article/paging')
-  ) {
-    console.log(request.body, 'request.body');
-    const body = JSON.parse(request.body);
-    body.pageSize = 2;
-    request.body = JSON.stringify(body);
-  }
-  request.response.push((response: AjaxResponse) => {
-    if (request.url === '/portal/searchHome') {
-      const result = JSON.parse(response.responseText as string);
-      result.result.data.children = result.result.data.children.slice(0, 2);
-      response.responseText = JSON.stringify(result);
-    }
-    if (
-      request.type === 'FETCH' &&
-      response.bodyUsed &&
-      request.url.includes?.('/api/docs')
-    ) {
-      console.log('json Result', response.json);
-      response.json.data.content_updated_at = '2025-07-30T03:21:10.000Z';
-    }
-    if (response.url.includes?.('v1/nex')) {
-      console.log('123');
-    }
-    if (
-      request.type === 'FETCH' &&
-      response.bodyUsed &&
-      (typeof request.url === 'object' || response.url.includes?.('next'))
-    ) {
-      console.log('youtubejson Result', response.text);
-    }
-  });
+  request.response.push((response: AjaxResponse) => {});
   return request;
 });
 
