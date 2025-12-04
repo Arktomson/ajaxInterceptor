@@ -410,10 +410,15 @@ class AjaxInterceptor {
 }
 
 const ajaxInterceptor: AjaxInterceptor = AjaxInterceptor.getInstance();
+console.log(
+  'window.XMLHttpRequest.prototype',
+  Object.keys(window.XMLHttpRequest.prototype)
+);
 ajaxInterceptor.inject();
 let count = 0;
+
 ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
-  console.log(`%c${++count} twices-x200 ultra`, 'color: red', request.url);
+  console.log(`%c${++count} twices-x200 ultra111`, 'color: red', request.url);
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';
