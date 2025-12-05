@@ -93,13 +93,32 @@ class XhrInterceptor {
       };
     },
   };
+
+  private getAttrHandler(target: XMLHttpRequest, attr: string) {
+    if (this.xhrInstanceAttr.includes(attr)) {
+      return this.xhrInstanceAttrHandler[attr](target);
+    }
+    if(this.xhrMethodsHandler[attr]) {
+      return this.xhrMethodsHandler[attr](this, target);
+    }
+    return null;
+  }
+
+  private normalGetReturn(target: XMLHttpRequest, prop: string) {
+    if (typeof target[prop] === 'function') {
+      return function (...args) {
+        return target[prop].apply(target, args);
+      };
+    }
+    return Reflect.get(target, prop);
+  }
   _generateProxyXMLHttpRequest() {
     const self = this;
     this.xhrInstanceAttrHandler = this.xhrInstanceAttr
       .map((attr) => {
         return {
           name: attr,
-          handler: function (self, target) {
+          handler: function (target) {
             const hooker = target[CYCLE_SCHEDULER];
             if (!hooker.xhrAlreadyReturned) {
               return target[attr];
@@ -141,18 +160,11 @@ class XhrInterceptor {
       });
       const proxyXhr = new Proxy(xhr, {
         get(target, prop: string) {
-          const perhapsHandler =
-            self.xhrMethodsHandler[prop]?.(self, target) ||
-            self.xhrInstanceAttrHandler[prop]?.(self, target);
-          if (perhapsHandler) {
-            return perhapsHandler;
+          const attrHandler = self.getAttrHandler(target, prop);
+          if (attrHandler) {
+            return attrHandler;
           }
-          if (typeof target[prop] === 'function') {
-            return function (...args) {
-              return target[prop].apply(target, args);
-            };
-          }
-          return Reflect.get(target, prop);
+          return self.normalGetReturn(target, prop);
         },
         set(target: XMLHttpRequest, prop: string, value) {
           if (prop === 'onreadystatechange' || prop === 'onload') {
