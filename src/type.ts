@@ -1,5 +1,7 @@
 import { AJAX_TYPE } from "./constant";
 
+export type AjaxType = typeof AJAX_TYPE[keyof typeof AJAX_TYPE];
+
 type TypedArray =
   | Int8Array
   | Uint8Array
@@ -26,7 +28,6 @@ export interface XhrResponse {
     | ReadableStream;
   responseText: string;
   responseXML: Document;
-  responseType: string;
 }
 
 export interface FetchResponse
@@ -48,7 +49,10 @@ export interface FetchResponse
 export interface AjaxResponse
   extends BaseResponse,
     Partial<XhrResponse & FetchResponse> {}
-export interface AjaxInterceptorRequest {
+export interface XhrRequest {
+  responseType?: string;
+}
+export interface AjaxInterceptorRequest extends XhrRequest{
   type: (typeof AJAX_TYPE)[keyof typeof AJAX_TYPE];
   method: string;
   url: string | URL;
@@ -66,5 +70,9 @@ export interface AjaxInterceptorRequest {
     | File
     | TypedArray
     | null;
-  response: ((response: AjaxResponse) => void)[];
+  response: (response: AjaxResponse) => void
+}
+
+export interface HookFunction {
+  (request: AjaxInterceptorRequest): void;
 }

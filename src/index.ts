@@ -1,6 +1,11 @@
 import { AJAX_TYPE, CYCLE_SCHEDULER } from './constant';
-import { AjaxInterceptorRequest, AjaxResponse } from './type';
-import { mapValues } from 'lodash-es';
+import {
+  AjaxInterceptorRequest,
+  AjaxResponse,
+  HookFunction,
+  AjaxType,
+} from './type';
+import { cloneDeep, mapValues } from 'lodash-es';
 class XhrInterceptor {
   public readonly nativeXhr = window.XMLHttpRequest;
   public readonly nativeXhrPrototype = this.nativeXhr.prototype;
@@ -26,70 +31,125 @@ class XhrInterceptor {
     'status',
     'statusText',
   ];
+  private async responseProcessor(target: XMLHttpRequest) {
+    const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
+    if (hooker.xhrAlreadyReturned) {
+      return;
+    }
+    hooker.xhrAlreadyReturned = true;
+    hooker.resp = {
+      status: target.status,
+      statusText: target.statusText,
+      response: target.response,
+      responseText:
+        target.responseType === 'text' || target.responseType === ''
+          ? target.responseText
+          : null,
+      responseXML:
+        target.responseType === 'document' || target.responseType === ''
+          ? target.responseXML
+          : null,
+    };
+    await hooker.request.response(hooker.resp);
+  }
   private xhrMethodsHandler = {
     open: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return function (...args: Parameters<XMLHttpRequest['open']>) {
-        const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
+        const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
         hooker.xhrReset();
         hooker.request = {
-          type: 'XHR',
+          type: 'xhr',
           method: args[0] || 'GET',
           url: args[1] || '',
           async: args[2] || true,
           headers: {},
           body: null,
-          response: [],
+          response: () => {},
         };
-        hooker.xhrOpenRestArgs = args.slice(3);
-        self.nativeXhrPrototype.open.apply(target, [
+        hooker.xhrOpenRestArgs = args.slice(2);
+        Reflect.apply(self.nativeXhrPrototype.open, target, [
           hooker.request.method,
           hooker.request.url,
-          hooker.request.async,
           ...(hooker.xhrOpenRestArgs || []),
         ]);
       };
     },
     send: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return async function (body: Parameters<XMLHttpRequest['send']>) {
-        const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
+        const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
+        hooker.request.responseType = target.responseType || '';
         hooker.request.headers = mapValues(
           hooker.xhrSetRequestAfterOpen,
-          (val) => val.join(',')
+          (val) => val.join(', ')
         );
-        const oldRequest = Object.assign({}, hooker.request);
+        const oldRequest = cloneDeep(hooker.request);
         const newRequest = await hooker.execute(hooker.request, self.hooks);
         hooker.request = newRequest;
 
-        if (
+        console.log(oldRequest.headers, 'oldRequest.headers');
+        console.log(newRequest.headers, 'newRequest.headers');
+        const needReopen =
           oldRequest.method !== newRequest.method ||
-          oldRequest.url !== newRequest.url ||
-          oldRequest.async !== newRequest.async
-        ) {
-          self.nativeXhrPrototype.open.apply(target, [
+          oldRequest.url !== newRequest.url;
+
+        const headersChanged =
+          JSON.stringify(oldRequest.headers) !==
+          JSON.stringify(newRequest.headers);
+
+        if (needReopen) {
+          console.log('reopen, bingo');
+          Reflect.apply(self.nativeXhrPrototype.open, target, [
             hooker.request.method,
             hooker.request.url,
-            hooker.request.async,
             ...(hooker.xhrOpenRestArgs || []),
           ]);
-          for (let [key, val] of Object.entries(hooker.request.headers)) {
+          // 重新 open 后需要重新设置所有 headers
+          for (let [key, val] of Object.entries(hooker.request.headers || {})) {
+            target.setRequestHeader(key, val);
+          }
+        } else if (headersChanged) {
+          // 如果只修改了 headers，需要更新已设置的 headers
+          for (let [key, val] of Object.entries(hooker.request.headers || {})) {
             target.setRequestHeader(key, val);
           }
         }
 
-        self.nativeXhrPrototype.send.apply(target, [hooker.request.body]);
+        Reflect.apply(self.nativeXhrPrototype.send, target, [
+          hooker.request.body,
+        ]);
       };
     },
     setRequestHeader: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return function (name: string, value: string) {
-        const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
-        // 先调用“原生”，成功后再缓存，确保与浏览器限制一致（某些禁止头会被拒）
-        self.nativeXhrPrototype.setRequestHeader.call(target, name, value);
+        const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
+        Reflect.apply(self.nativeXhrPrototype.setRequestHeader, target, [
+          name,
+          value,
+        ]);
 
         const key = name.toLowerCase();
         const headers = hooker.xhrSetRequestAfterOpen[key] ?? [];
         headers.push(value);
         hooker.xhrSetRequestAfterOpen[key] = headers;
+      };
+    },
+    addEventListener: function (self: XhrInterceptor, target: XMLHttpRequest) {
+      return function (type: string, listener: EventListener, ...args: any[]) {
+        let newListener = listener;
+        if (
+          type === 'readystatechange' ||
+          type === 'load' ||
+          type === 'loadend'
+        ) {
+          newListener = async function (...args) {
+            if (target.readyState === 4) {
+              await self.responseProcessor(target);
+            }
+            listener(...args);
+          };
+        }
+        target.addEventListener(type, newListener, ...args);
       };
     },
   };
@@ -98,7 +158,7 @@ class XhrInterceptor {
     if (this.xhrInstanceAttr.includes(attr)) {
       return this.xhrInstanceAttrHandler[attr](target);
     }
-    if(this.xhrMethodsHandler[attr]) {
+    if (this.xhrMethodsHandler[attr]) {
       return this.xhrMethodsHandler[attr](this, target);
     }
     return null;
@@ -112,52 +172,22 @@ class XhrInterceptor {
     }
     return Reflect.get(target, prop);
   }
-  _generateProxyXMLHttpRequest() {
+  private _generateProxyXMLHttpRequest() {
     const self = this;
-    this.xhrInstanceAttrHandler = this.xhrInstanceAttr
-      .map((attr) => {
-        return {
-          name: attr,
-          handler: function (target) {
-            const hooker = target[CYCLE_SCHEDULER];
-            if (!hooker.xhrAlreadyReturned) {
-              return target[attr];
-            }
-            return hooker.resp[attr];
-          },
-        };
-      })
-      .reduce((acc, curr) => {
-        acc[curr.name] = curr.handler;
-        return acc;
-      }, {});
+    this.xhrInstanceAttrHandler = this.xhrInstanceAttr.reduce((acc, attr) => {
+      acc[attr] = function (target) {
+        const hooker = target[CYCLE_SCHEDULER];
+        if (!hooker.xhrAlreadyReturned) {
+          return target[attr];
+        }
+        return hooker.resp[attr];
+      };
+      return acc;
+    }, {});
     function proxyXhr() {
       const xhr = new self.nativeXhr();
-      xhr[CYCLE_SCHEDULER] = new CycleScheduler();
+      xhr[CYCLE_SCHEDULER] = new XhrCycleScheduler();
 
-      xhr.addEventListener('readystatechange', async () => {
-        if (xhr.readyState === 4) {
-          const hooker: CycleScheduler = xhr[CYCLE_SCHEDULER];
-          hooker.xhrAlreadyReturned = true;
-          hooker.resp = {
-            status: xhr.status,
-            statusText: xhr.statusText,
-            response: xhr.response,
-            responseText:
-              xhr.responseType === 'text' || xhr.responseType === ''
-                ? xhr.responseText
-                : null,
-            responseXML:
-              xhr.responseType === 'document' || xhr.responseType === ''
-                ? xhr.responseXML
-                : null,
-            responseType: xhr.responseType,
-          };
-          for (let val of hooker.request.response) {
-            await val(hooker.resp);
-          }
-        }
-      });
       const proxyXhr = new Proxy(xhr, {
         get(target, prop: string) {
           const attrHandler = self.getAttrHandler(target, prop);
@@ -167,35 +197,19 @@ class XhrInterceptor {
           return self.normalGetReturn(target, prop);
         },
         set(target: XMLHttpRequest, prop: string, value) {
-          if (prop === 'onreadystatechange' || prop === 'onload') {
-            target[prop] = function (...args) {
-              (async () => {
-                if (target.readyState === 4) {
-                  const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
-                  hooker.xhrAlreadyReturned = true;
-                  hooker.resp = {
-                    status: target.status,
-                    statusText: target.statusText,
-                    response: target.response,
-                    responseText:
-                      target.responseType === 'text' ||
-                      target.responseType === ''
-                        ? target.responseText
-                        : null,
-                    responseXML:
-                      target.responseType === 'document' ||
-                      target.responseType === ''
-                        ? target.responseXML
-                        : null,
-                    responseType: target.responseType,
-                  };
-                  for (let val of hooker.request.response) {
-                    await val(hooker.resp);
-                  }
-                }
-                target[prop].apply(target, args);
-              })();
+          if (
+            prop === 'onreadystatechange' ||
+            prop === 'onload' ||
+            prop === 'onloadend'
+          ) {
+            const fn = async (...args) => {
+              if (target.readyState === 4) {
+                await self.responseProcessor(target);
+              }
+              value(...args);
             };
+            Reflect.set(target, prop, fn);
+            return true; // Proxy set trap 必须返回 true
           }
           return Reflect.set(target, prop, value);
         },
@@ -207,7 +221,13 @@ class XhrInterceptor {
       proxyXhr[key] = self.nativeXhr[key];
     });
     proxyXhr.prototype = this.nativeXhrPrototype;
-    return proxyXhr;
+    return proxyXhr as unknown as typeof XMLHttpRequest;
+  }
+  public inject() {
+    window.XMLHttpRequest = this._generateProxyXMLHttpRequest();
+  }
+  public uninject() {
+    window.XMLHttpRequest = this.nativeXhr;
   }
 }
 class FetchInterceptor {
@@ -240,7 +260,7 @@ class FetchInterceptor {
     }
     return FetchInterceptor.#instance;
   }
-  _generateProxyFetch() {
+  private _generateProxyFetch() {
     const self = this;
 
     this.fetchInstanceAttrHandler = this.fetchInstanceAttr
@@ -258,36 +278,27 @@ class FetchInterceptor {
         return acc;
       }, {});
 
-    this.fetchMethodsHandler = this.fetchMethods
-      .map((method) => {
-        return {
-          name: method,
-          handler: function (self, target) {
-            return async function (...args) {
-              const hooker: CycleScheduler = target[CYCLE_SCHEDULER];
-              const result = await target[method].apply(target, args);
+    this.fetchMethodsHandler = this.fetchMethods.reduce((acc, method) => {
+      acc[method] = function (self, target) {
+        return async function (...args) {
+          const hooker: FetchCycleScheduler = target[CYCLE_SCHEDULER];
+          const result = await target[method].apply(target, args);
 
-              console.log(`%c fetch Result ${method}`, 'color: purple', result);
-              hooker.resp.bodyUsed = hooker.fetchBodyUsed = true;
-              hooker.resp[method] = result;
-              if (hooker.request.url.includes?.('v1/nex')) {
-                console.log('123');
-              }
-              for (let val of hooker.request.response) {
-                await val(hooker.resp);
-              }
-              return hooker.resp[method];
-            };
-          },
+          console.log(`%c fetch Result ${method}`, 'color: purple', result);
+          hooker.resp.bodyUsed = hooker.fetchBodyUsed = true;
+          hooker.resp[method] = result;
+          if (hooker.request.url.includes?.('v1/nex')) {
+            console.log('123');
+          }
+          await hooker.request.response(hooker.resp);
+          return hooker.resp[method];
         };
-      })
-      .reduce((acc, curr) => {
-        acc[curr.name] = curr.handler;
-        return acc;
-      }, {});
+      };
+      return acc;
+    }, {});
     async function proxyFetch(url: string, options: RequestInit = {}) {
       const winFetch = self.nativeFetch;
-      const hooker = new CycleScheduler();
+      const hooker = new FetchCycleScheduler();
       const newRequest = await hooker.execute(
         {
           type: AJAX_TYPE.FETCH,
@@ -295,7 +306,7 @@ class FetchInterceptor {
           method: options.method,
           headers: options.headers as Record<string, string>,
           body: options.body,
-          response: [],
+          response: () => {},
         },
         self.hooks
       );
@@ -316,9 +327,8 @@ class FetchInterceptor {
         redirected: fh.redirected,
         bodyUsed: hooker.fetchBodyUsed,
       };
-      for (let val of hooker.request.response) {
-        await val(hooker.resp);
-      }
+      await hooker.request.response(hooker.resp);
+
       fh[CYCLE_SCHEDULER] = hooker;
       const proxyFh = new Proxy(fh, {
         get(target, prop) {
@@ -347,14 +357,16 @@ class FetchInterceptor {
     proxyFetch.prototype = this.nativeFetchPrototype;
     return proxyFetch;
   }
+  public inject() {
+    window.fetch = this._generateProxyFetch();
+  }
+  public uninject() {
+    window.fetch = this.nativeFetch;
+  }
 }
 class CycleScheduler {
   public request: AjaxInterceptorRequest = {} as AjaxInterceptorRequest;
   public resp: AjaxResponse = {} as AjaxResponse;
-  public xhrOpenRestArgs: (string | boolean | URL)[] = [];
-  public xhrSetRequestAfterOpen: Record<string, string[]> = {};
-  public xhrAlreadyReturned = false;
-  public fetchBodyUsed = false;
   constructor({
     request = {} as AjaxInterceptorRequest,
   }: {
@@ -362,14 +374,6 @@ class CycleScheduler {
   } = {}) {
     this.request = request;
   }
-  xhrReset() {
-    this.request = {} as AjaxInterceptorRequest;
-    this.resp = {} as AjaxResponse;
-    this.xhrOpenRestArgs = [];
-    this.xhrSetRequestAfterOpen = {};
-    this.xhrAlreadyReturned = false;
-  }
-
   async execute(request: AjaxInterceptorRequest, fnList: Function[]) {
     let result = request;
     for (const fn of fnList) {
@@ -379,6 +383,36 @@ class CycleScheduler {
       }
     }
     return result;
+  }
+}
+
+class XhrCycleScheduler extends CycleScheduler {
+  public xhrAlreadyReturned = false;
+  public xhrOpenRestArgs: (string | boolean | URL)[] = [];
+  public xhrSetRequestAfterOpen: Record<string, string[]> = {};
+  public xhrReset() {
+    this.request = {} as AjaxInterceptorRequest;
+    this.resp = {} as AjaxResponse;
+    this.xhrOpenRestArgs = [];
+    this.xhrSetRequestAfterOpen = {};
+    this.xhrAlreadyReturned = false;
+  }
+  constructor({
+    request = {} as AjaxInterceptorRequest,
+  }: {
+    request?: AjaxInterceptorRequest;
+  } = {}) {
+    super({ request });
+  }
+}
+class FetchCycleScheduler extends CycleScheduler {
+  public fetchBodyUsed = false;
+  constructor({
+    request = {} as AjaxInterceptorRequest,
+  }: {
+    request?: AjaxInterceptorRequest;
+  } = {}) {
+    super({ request });
   }
 }
 class AjaxInterceptor {
@@ -401,18 +435,17 @@ class AjaxInterceptor {
     return AjaxInterceptor.#instance;
   }
   inject() {
-    window.XMLHttpRequest =
-      this.xhrInterceptor._generateProxyXMLHttpRequest() as any;
-    window.fetch = this.fetchInterceptor._generateProxyFetch() as any;
+    this.xhrInterceptor.inject();
+    this.fetchInterceptor.inject();
   }
   uninject() {
-    window.XMLHttpRequest = this.xhrInterceptor.nativeXhr;
-    window.fetch = this.fetchInterceptor.nativeFetch;
+    this.xhrInterceptor.uninject();
+    this.fetchInterceptor.uninject();
   }
-  hook(fn: Function, type?: 'xhr' | 'fetch') {
-    if (type === 'xhr') {
+  hook(fn: HookFunction, type?: AjaxType) {
+    if (type === AJAX_TYPE.XHR) {
       this.xhrInterceptor.hooks.push(fn);
-    } else if (type === 'fetch') {
+    } else if (type === AJAX_TYPE.FETCH) {
       this.fetchInterceptor.hooks.push(fn);
     } else {
       this.xhrInterceptor.hooks.push(fn);
@@ -422,15 +455,16 @@ class AjaxInterceptor {
 }
 
 const ajaxInterceptor: AjaxInterceptor = AjaxInterceptor.getInstance();
-console.log(
-  'window.XMLHttpRequest.prototype',
-  Object.keys(window.XMLHttpRequest.prototype)
-);
+
 ajaxInterceptor.inject();
 let count = 0;
 
-ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
-  console.log(`%c${++count} twices-x200 ultra111`, 'color: red', request.url);
+ajaxInterceptor.hook((request) => {
+  console.log(
+    `%c${++count} twices-x200 ultra111-xx`,
+    'color: red',
+    request.url
+  );
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';
@@ -438,7 +472,7 @@ ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
   }
 
   if (
-    request.type === 'FETCH' &&
+    request.type === 'fetch' &&
     typeof request.url === 'string' &&
     request.url.includes('/admin/article/paging')
   ) {
@@ -447,31 +481,38 @@ ajaxInterceptor.hook((request: AjaxInterceptorRequest) => {
     body.pageSize = 2;
     request.body = JSON.stringify(body);
   }
-  request.response.push((response: AjaxResponse) => {
+  if (request.url === 'https://jsonplaceholder.typicode.com/posts') {
+    console.log('bingo');
+    request.headers.kpi = '10000';
+    console.log(request.responseType, 'request.responseType');
+  }
+  request.response = (response: AjaxResponse) => {
     if (request.url === '/portal/searchHome') {
       const result = JSON.parse(response.responseText as string);
-      result.result.data.children = result.result.data.children.slice(0, 2);
+      console.log(result, 'result');
+      result.result.data.children = result.result.data.children?.slice?.(0, 2);
       response.responseText = JSON.stringify(result);
     }
+
     if (
-      request.type === 'FETCH' &&
+      request.type === 'fetch' &&
       response.bodyUsed &&
       request.url.includes?.('/api/docs')
     ) {
       console.log('json Result', response.json);
       response.json.data.content_updated_at = '2025-07-30T03:21:10.000Z';
     }
-    if (response.url.includes?.('v1/nex')) {
+    if (request.url.includes?.('v1/nex')) {
       console.log('123');
     }
     if (
-      request.type === 'FETCH' &&
+      request.type === 'fetch' &&
       response.bodyUsed &&
       (typeof request.url === 'object' || response.url.includes?.('next'))
     ) {
       console.log('youtubejson Result', response.text);
     }
-  });
+  };
   return request;
 });
 
