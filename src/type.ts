@@ -16,18 +16,26 @@ export interface XhrResponse {
     | Document
 }
 
-export interface FetchResponse
-  extends Pick<
-    Response,
-    | "ok"
-    | "redirected"
-    | "text"
-    | "arrayBuffer"
-    | "blob"
-    | "formData"
-    | "json"
-  > {
+export interface FetchResponse 
+  // extends Pick<
+  //   Response,
+  //   | "ok"
+  //   | "redirected"
+  //   | "text"
+  //   | "arrayBuffer"
+  //   | "blob"
+  //   | "formData"
+  //   | "json"
+  // > 
+  {
   bodyUsed: boolean;
+  ok: boolean;
+  redirected: boolean;
+  text: string;
+  arrayBuffer: ArrayBuffer;
+  blob: Blob;
+  formData: FormData;
+  json: any;
 }
 
 export interface AjaxResponse

@@ -10,3 +10,14 @@ export const getType = Object.prototype.toString.call.bind(
 export const resolveUrl = (url) => {
   return new URL(url, window.location.origin).toString();
 };
+
+export const safeStringify = (value: any) => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value) || String(value);
+  } catch (error) {
+    return '';
+  }
+};
