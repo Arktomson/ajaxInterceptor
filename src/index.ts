@@ -3,9 +3,10 @@ import {
   AjaxInterceptorRequest,
   AjaxResponse,
   HookFunction,
-  AjaxType,
+  AjaxType
 } from './type';
 import { cloneDeep, mapValues } from 'lodash-es';
+import { getType, resolveUrl } from './utils';
 class XhrInterceptor {
   public readonly nativeXhr = window.XMLHttpRequest;
   public readonly nativeXhrPrototype = this.nativeXhr.prototype;
@@ -31,24 +32,60 @@ class XhrInterceptor {
     'status',
     'statusText',
   ];
+  private parseHeaders(
+    obj: string | Headers | Record<string, string> | null | undefined
+  ): Record<string, string> {
+    const headers: Record<string, string> = {};
+
+    if (!obj) return headers;
+
+    // 统一的合并逻辑
+    const mergeHeader = (key: string, value: string) => {
+      const lkey = key.toLowerCase();
+      headers[lkey] = lkey in headers ? `${headers[lkey]}, ${value}` : value;
+    };
+
+    const type = getType(obj);
+    if (type === '[object String]') {
+      const str = obj as string;
+      for (const line of str.trim().split(/[\r\n]+/)) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex === -1) continue;
+        const header = line.slice(0, colonIndex).trim();
+        const value = line.slice(colonIndex + 1).trim();
+        if (!header) continue;
+        mergeHeader(header, value);
+      }
+    } else if (type === '[object Headers]') {
+      // 使用entries()确保获取所有headers
+      const headersObj = obj as Headers;
+      headersObj.forEach((val, key) => {
+        mergeHeader(key, val);
+      });
+    } else if (type === '[object Object]') {
+      // 确保key统一为小写
+      const record = obj as Record<string, string>;
+      for (const [key, val] of Object.entries(record)) {
+        if (val != null) {
+          mergeHeader(key, String(val));
+        }
+      }
+    }
+    return headers;
+  }
   private async responseProcessor(target: XMLHttpRequest) {
     const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
     if (hooker.xhrAlreadyReturned) {
       return;
     }
     hooker.xhrAlreadyReturned = true;
+    
     hooker.resp = {
       status: target.status,
       statusText: target.statusText,
       response: target.response,
-      responseText:
-        target.responseType === 'text' || target.responseType === ''
-          ? target.responseText
-          : null,
-      responseXML:
-        target.responseType === 'document' || target.responseType === ''
-          ? target.responseXML
-          : null,
+      headers: new Headers(this.parseHeaders(target.getAllResponseHeaders())),
+      finalUrl: target.responseURL || ''
     };
     await hooker.request.response(hooker.resp);
   }
@@ -60,7 +97,7 @@ class XhrInterceptor {
         hooker.request = {
           type: 'xhr',
           method: args[0] || 'GET',
-          url: args[1] || '',
+          url: resolveUrl(args[1]),
           async: args[2] || true,
           headers: {},
           body: null,
@@ -75,12 +112,11 @@ class XhrInterceptor {
       };
     },
     send: function (self: XhrInterceptor, target: XMLHttpRequest) {
-      return async function (body: Parameters<XMLHttpRequest['send']>) {
+      return async function (body: Parameters<XMLHttpRequest['send']>[0]) {
         const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
-        hooker.request.responseType = target.responseType || '';
         hooker.request.headers = mapValues(
-          hooker.xhrSetRequestAfterOpen,
+          hooker.xhrSetRequestHeadersAfterOpen,
           (val) => val.join(', ')
         );
         const oldRequest = cloneDeep(hooker.request);
@@ -129,9 +165,9 @@ class XhrInterceptor {
         ]);
 
         const key = name.toLowerCase();
-        const headers = hooker.xhrSetRequestAfterOpen[key] ?? [];
+        const headers = hooker.xhrSetRequestHeadersAfterOpen[key] ?? [];
         headers.push(value);
-        hooker.xhrSetRequestAfterOpen[key] = headers;
+        hooker.xhrSetRequestHeadersAfterOpen[key] = headers;
       };
     },
     addEventListener: function (self: XhrInterceptor, target: XMLHttpRequest) {
@@ -242,7 +278,6 @@ class FetchInterceptor {
     'statusText',
     'ok',
     'headers',
-    'url',
     'redirected',
   ];
   private fetchMethodsHandler = {};
@@ -263,20 +298,13 @@ class FetchInterceptor {
   private _generateProxyFetch() {
     const self = this;
 
-    this.fetchInstanceAttrHandler = this.fetchInstanceAttr
-      .map((attr) => {
-        return {
-          name: attr,
-          handler: function (self, target) {
-            const hooker = target[CYCLE_SCHEDULER];
-            return hooker.resp[attr];
-          },
-        };
-      })
-      .reduce((acc, curr) => {
-        acc[curr.name] = curr.handler;
-        return acc;
-      }, {});
+    this.fetchInstanceAttrHandler = this.fetchInstanceAttr.reduce((acc, attr) => {
+      acc[attr] = function (self, target) {
+        const hooker = target[CYCLE_SCHEDULER];
+        return hooker.resp[attr];
+      };
+      return acc;
+    }, {});
 
     this.fetchMethodsHandler = this.fetchMethods.reduce((acc, method) => {
       acc[method] = function (self, target) {
@@ -296,7 +324,7 @@ class FetchInterceptor {
       };
       return acc;
     }, {});
-    async function proxyFetch(url: string, options: RequestInit = {}) {
+    async function proxyFetch(url: string, options: RequestInit) {
       const winFetch = self.nativeFetch;
       const hooker = new FetchCycleScheduler();
       const newRequest = await hooker.execute(
@@ -312,7 +340,7 @@ class FetchInterceptor {
       );
       hooker.request = newRequest;
       const fh: Response = await winFetch(newRequest.url, {
-        ...options,
+        ...(options ? { ...options } : {}),
         ...(newRequest.headers ? { headers: newRequest.headers } : {}),
         ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
         ...(newRequest.method ? { method: newRequest.method } : {}),
@@ -323,7 +351,7 @@ class FetchInterceptor {
         statusText: fh.statusText,
         ok: fh.ok,
         headers: fh.headers,
-        url: fh.url,
+        finalUrl: fh.url,
         redirected: fh.redirected,
         bodyUsed: hooker.fetchBodyUsed,
       };
@@ -389,12 +417,12 @@ class CycleScheduler {
 class XhrCycleScheduler extends CycleScheduler {
   public xhrAlreadyReturned = false;
   public xhrOpenRestArgs: (string | boolean | URL)[] = [];
-  public xhrSetRequestAfterOpen: Record<string, string[]> = {};
+  public xhrSetRequestHeadersAfterOpen: Record<string, string[]> = {};
   public xhrReset() {
     this.request = {} as AjaxInterceptorRequest;
     this.resp = {} as AjaxResponse;
     this.xhrOpenRestArgs = [];
-    this.xhrSetRequestAfterOpen = {};
+    this.xhrSetRequestHeadersAfterOpen = {};
     this.xhrAlreadyReturned = false;
   }
   constructor({
@@ -461,7 +489,7 @@ let count = 0;
 
 ajaxInterceptor.hook((request) => {
   console.log(
-    `%c${++count} twices-x200 ultra111-xx`,
+    `%c${++count} twices-x200 pbx`,
     'color: red',
     request.url
   );
@@ -477,21 +505,20 @@ ajaxInterceptor.hook((request) => {
     request.url.includes('/admin/article/paging')
   ) {
     console.log(request.body, 'request.body');
-    const body = JSON.parse(request.body);
+    const body = JSON.parse(request.body as string);
     body.pageSize = 2;
     request.body = JSON.stringify(body);
   }
   if (request.url === 'https://jsonplaceholder.typicode.com/posts') {
     console.log('bingo');
     request.headers.kpi = '10000';
-    console.log(request.responseType, 'request.responseType');
   }
   request.response = (response: AjaxResponse) => {
     if (request.url === '/portal/searchHome') {
-      const result = JSON.parse(response.responseText as string);
+      const result = JSON.parse(response.response as string);
       console.log(result, 'result');
       result.result.data.children = result.result.data.children?.slice?.(0, 2);
-      response.responseText = JSON.stringify(result);
+      response.response = JSON.stringify(result);
     }
 
     if (
