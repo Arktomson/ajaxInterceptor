@@ -29,7 +29,7 @@ const baseConfig = {
             verbose: true,
             contentBase: ["dist"],
             host: "localhost",
-            port: 3000,
+            port: 3010,
           }),
           // livereload({
           //   watch: "dist",

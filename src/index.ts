@@ -325,24 +325,22 @@ class FetchInterceptor {
     this.fetchMethodsHandler = this.fetchMethods.reduce((acc, methodName) => {
       acc[methodName] = function (self, target) {
         return async function (...args) {
-          console.log(target.headers, 'target.headers');
           const hooker: FetchCycleScheduler = target[CYCLE_SCHEDULER];
-          // const result = await target[methodName].apply(target, args);
           return hooker.resp[methodName];
         };
       };
       return acc;
     }, {});
-    async function proxyFetch(url: string, options: RequestInit) {
+    async function proxyFetch(url: string, options: RequestInit = {}) {
       const winFetch = self.nativeFetch;
       const hooker = new FetchCycleScheduler();
       const newRequest = await hooker.execute(
         {
           type: AJAX_TYPE.FETCH,
           url,
-          method: options.method,
+          method: options.method || 'GET',
           // TODO: 这里需要处理 headers 的类型
-          headers: options.headers as Record<string, string>,
+          headers: options.headers as Record<string, string> || {},
           body: options.body,
           response: () => {},
         },
@@ -552,13 +550,13 @@ ajaxInterceptor.hook((request) => {
       console.log('json Result', response.json);
       response.json.data.content_updated_at = '2025-07-30T03:21:10.000Z';
     }
-    // if (
-    //   request.type === 'fetch' &&
-    //   response.bodyUsed &&
-    //   (typeof request.url === 'object' || response.url.includes?.('next'))
-    // ) {
-    //   console.log('youtubejson Result', response.text);
-    // }
+    if (
+      request.type === 'fetch' &&
+      response.bodyUsed &&
+      (typeof request.url === 'object' || response.finalUrl.includes?.('next'))
+    ) {
+      console.log('youtubejson Result', response.text);
+    }
   };
   return request;
 });
