@@ -325,6 +325,7 @@ class FetchInterceptor {
     this.fetchMethodsHandler = this.fetchMethods.reduce((acc, methodName) => {
       acc[methodName] = function (self, target) {
         return async function (...args) {
+          console.log(target.headers, 'target.headers');
           const hooker: FetchCycleScheduler = target[CYCLE_SCHEDULER];
           // const result = await target[methodName].apply(target, args);
           return hooker.resp[methodName];
@@ -362,6 +363,8 @@ class FetchInterceptor {
         fh.clone().blob(),
         fh.clone().formData(),
       ]).then((results) => results.map((result) => result.status === 'fulfilled' ? result.value : null));
+      console.log(fh.headers, 'fh.headers');
+      console.log(fh.headers.get('Content-Type'), 'Content-Type');
       hooker.resp = {
         status: fh.status,
         statusText: fh.statusText,
@@ -532,8 +535,7 @@ ajaxInterceptor.hook((request) => {
       response.response = JSON.stringify(result);
     }
     if(request.type === 'fetch') {
-    } 
-    if(request.type === 'fetch') {
+      console.log(response.headers, 'response.headers');
       console.log(response.finalUrl, 'finalUrl');
       console.log(`%c fetch Result  new`, 'color: purple', response.json);
       const data = response.json.data;
