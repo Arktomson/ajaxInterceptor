@@ -5,7 +5,7 @@ import {
   HookFunction,
   AjaxType,
 } from './type';
-import { cloneDeep, mapValues } from 'lodash-es';
+import { cloneDeep, isNil, mapValues, pickBy } from 'lodash-es';
 import { getType, resolveUrl, safeStringify } from './utils';
 class XhrInterceptor {
   public readonly nativeXhr = window.XMLHttpRequest;
@@ -89,8 +89,7 @@ class XhrInterceptor {
     };
     try {
       await hooker.request.response(hooker.resp);
-    } catch (error) {
-    }
+    } catch (error) {}
   }
   private xhrMethodsHandler = {
     open: function (self: XhrInterceptor, target: XMLHttpRequest) {
@@ -308,6 +307,66 @@ class FetchInterceptor {
     }
     return Reflect.get(target, prop);
   }
+  private normalizeRequest(req: string | URL | Request) {
+    let url = '';
+    let method = null;
+    let headers = null;
+    let body = null;
+    if (typeof req === 'string') {
+      url = resolveUrl(req);
+    } else if (req instanceof URL) {
+      url = resolveUrl(req);
+    } else {
+      url = resolveUrl(req.url);
+      method = req.method ?? null;
+      headers = req.headers ?? null;
+      body = req.body ?? null;
+    }
+    return {
+      url,
+      method,
+      headers,
+      body,
+    };
+  }
+  private resolveRequest(
+    req: string | URL | Request,
+    newRequest: AjaxInterceptorRequest
+  ): string | URL | Request {
+    if (typeof req === 'string') {
+      return newRequest.url;
+    }
+    if (req instanceof URL) {
+      return new URL(newRequest.url);
+    }
+    if (req instanceof Request) {
+      return new Request(
+        newRequest.url,
+        pickBy(req, (value, key) => key !== 'url' && !isNil(value))
+      );
+    }
+    return req;
+  }
+  private resolveOptions({
+    options,
+    newRequest,
+    request,
+  }: {
+    options: RequestInit;
+    newRequest: AjaxInterceptorRequest;
+    request: string | URL | Request;
+  }) {
+    const streamOptions = {
+      duplex: 'half',
+    };
+    return {
+      ...(options ? options : {}),
+      ...(newRequest.headers ? { headers: newRequest.headers } : {}),
+      ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
+      ...(newRequest.method ? { method: newRequest.method } : {}),
+      ...(newRequest.body instanceof ReadableStream ? streamOptions : {}),
+    };
+  }
   private _generateProxyFetch() {
     const self = this;
 
@@ -331,36 +390,50 @@ class FetchInterceptor {
       };
       return acc;
     }, {});
-    async function proxyFetch(url: string, options: RequestInit = {}) {
+    async function proxyFetch(
+      req: string | URL | Request,
+      options: RequestInit = {}
+    ) {
+      const request = self.normalizeRequest(req);
       const winFetch = self.nativeFetch;
       const hooker = new FetchCycleScheduler();
+
       const newRequest = await hooker.execute(
         {
           type: AJAX_TYPE.FETCH,
-          url,
-          method: options.method || 'GET',
+          url: request.url,
+          method: request.method ?? options.method ?? 'GET',
           // TODO: 这里需要处理 headers 的类型
-          headers: options.headers as Record<string, string> || {},
-          body: options.body,
+          headers: request.headers ?? options.headers ?? null,
+          body: request.body ?? options.body ?? null,
           response: () => {},
         },
         self.hooks
       );
       hooker.request = newRequest;
-      const fh: Response = await winFetch(newRequest.url, {
-        ...(options ? { ...options } : {}),
-        ...(newRequest.headers ? { headers: newRequest.headers } : {}),
-        ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
-        ...(newRequest.method ? { method: newRequest.method } : {}),
-      });
 
-      const [json, text, arrayBuffer, blob, formData] = await Promise.allSettled([
-        fh.clone().json(),
-        fh.clone().text(),
-        fh.clone().arrayBuffer(),
-        fh.clone().blob(),
-        fh.clone().formData(),
-      ]).then((results) => results.map((result) => result.status === 'fulfilled' ? result.value : null));
+      // if (request.body instanceof ReadableStream) {
+      //   console.log('命中',req,options)
+      //   console.log(self.resolveRequest(req, newRequest).duplex,'self.resolveRequest')
+      //   options.duplex = 'half';
+      // }
+      const fh: Response = await winFetch(
+        self.resolveRequest(req, newRequest),
+        self.resolveOptions({ options, newRequest, request: req })
+      );
+
+      const [json, text, arrayBuffer, blob, formData] =
+        await Promise.allSettled([
+          fh.clone().json(),
+          fh.clone().text(),
+          fh.clone().arrayBuffer(),
+          fh.clone().blob(),
+          fh.clone().formData(),
+        ]).then((results) =>
+          results.map((result) =>
+            result.status === 'fulfilled' ? result.value : null
+          )
+        );
       console.log(fh.headers, 'fh.headers');
       console.log(fh.headers.get('Content-Type'), 'Content-Type');
       hooker.resp = {
@@ -378,14 +451,13 @@ class FetchInterceptor {
       };
       try {
         await hooker.request.response(hooker.resp);
-      } catch (error) {
-      }
+      } catch (error) {}
 
       fh[CYCLE_SCHEDULER] = hooker;
       const proxyFh = new Proxy(fh, {
         get(target, prop) {
           const attrHandler = self.getAttrHandler(target, prop as string);
-          if (attrHandler) {  
+          if (attrHandler) {
             return attrHandler;
           }
           return self.normalGetReturn(target, prop as string);
@@ -532,12 +604,12 @@ ajaxInterceptor.hook((request) => {
       result.result.data.children = result.result.data.children?.slice?.(0, 2);
       response.response = JSON.stringify(result);
     }
-    if(request.type === 'fetch') {
+    if (request.type === 'fetch') {
       console.log(response.headers, 'response.headers');
       console.log(response.finalUrl, 'finalUrl');
       console.log(`%c fetch Result  new`, 'color: purple', response.json);
       const data = response.json.data;
-      if(data.length > 0) {
+      if (data.length > 0) {
         data[0].name = '草泥马';
       }
       response.json.data = data;

@@ -7,7 +7,14 @@ export const getType = Object.prototype.toString.call.bind(
   Object.prototype.toString
 );
 
-export const resolveUrl = (url) => {
+export const resolveUrl = (url: string | URL = '') => {
+  if (url instanceof URL) {
+    return url.toString();
+  }
+  const isAbsolute = url.startsWith('http');
+  if(isAbsolute) {
+    return url;
+  }
   return new URL(url, window.location.origin).toString();
 };
 
