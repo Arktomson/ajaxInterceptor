@@ -93,17 +93,17 @@ class XhrInterceptor {
   }
   private headersEqual(a: Headers, b: Headers) {
     if (a === b) return true;
-  
+
     const norm = (h) =>
       [...h.entries()]
         .map(([k, v]) => [k.toLowerCase(), v])
         .sort(([k1], [k2]) => k1.localeCompare(k2));
-  
+
     const A = norm(a);
     const B = norm(b);
-  
+
     if (A.length !== B.length) return false;
-  
+
     for (let i = 0; i < A.length; i++) {
       if (A[i][0] !== B[i][0] || A[i][1] !== B[i][1]) return false;
     }
@@ -135,10 +135,11 @@ class XhrInterceptor {
       return async function (body: Parameters<XMLHttpRequest['send']>[0]) {
         const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
-        hooker.request.headers = new Headers(mapValues(
-          hooker.xhrSetRequestHeadersAfterOpen,
-          (val) => val.join(', ')
-        ));
+        hooker.request.headers = new Headers(
+          mapValues(hooker.xhrSetRequestHeadersAfterOpen, (val) =>
+            val.join(', ')
+          )
+        );
         const oldRequest = cloneDeep(hooker.request);
         let newRequest = hooker.request;
         try {
@@ -150,8 +151,10 @@ class XhrInterceptor {
           oldRequest.method !== newRequest.method ||
           oldRequest.url !== newRequest.url;
 
-        const headersChanged =
-          !self.headersEqual(oldRequest.headers, newRequest.headers)
+        const headersChanged = !self.headersEqual(
+          oldRequest.headers,
+          newRequest.headers
+        );
 
         if (needReopen) {
           self.nativeXhrPrototype.open.apply(target, [
@@ -692,37 +695,15 @@ ajaxInterceptor.inject();
 let count = 0;
 
 ajaxInterceptor.hook((request) => {
-  console.log(`%c${++count} twices-x200 pbx`, 'color: red', request.url);
+  console.log(`%c${++count} twices-x200 pbx`, 'color: red', request);
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';
     request.body = JSON.stringify(body);
   }
 
-  if (
-    request.type === 'fetch' &&
-    typeof request.url === 'string' &&
-    request.url.includes('/admin/article/paging')
-  ) {
-    console.log(request.body, 'request.body');
-    const body = JSON.parse(request.body as string);
-    body.pageSize = 2;
-    request.body = JSON.stringify(body);
-  }
-  if (request.url === 'https://jsonplaceholder.typicode.com/posts') {
-    console.log('bingo');
-    request.headers.kpi = '10000';
-  }
   request.response = async (response: AjaxResponse) => {
-    request.onStreamChunk = async (chunk) => {
-      console.log(request.url, 'request.url');
-
-      console.log(chunk.index, 'chunk.index');
-      console.log(chunk.text, 'chunk.text');
-
-      return chunk.text; // 返回翻译后的文本
-    };
-    console.log(request.url, 'request.url');
+    console.log(response, 'response');
     if (request.url.includes('/portal/searchHome')) {
       const body = JSON.parse(request.body as string);
       console.log(request.body, 'req');
@@ -744,21 +725,6 @@ ajaxInterceptor.hook((request) => {
         data[0].name = '草泥马';
       }
       response.json.data = data;
-    }
-    if (
-      request.type === 'fetch' &&
-      response.bodyUsed &&
-      request.url.includes?.('/api/docs')
-    ) {
-      console.log('json Result', response.json);
-      response.json.data.content_updated_at = '2025-07-30T03:21:10.000Z';
-    }
-    if (
-      request.type === 'fetch' &&
-      response.bodyUsed &&
-      (typeof request.url === 'object' || response.finalUrl.includes?.('next'))
-    ) {
-      console.log('youtubejson Result', response.text);
     }
   };
   return request;
