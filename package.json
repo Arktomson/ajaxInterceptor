@@ -1,5 +1,5 @@
 {
-	"name": "web-hooker",
+	"name": "ajax-hooker",
 	"version": "1.0.0",
 	"description": "A plugin for intercepting and modifying AJAX requests",
 	"main": "dist/index.js",

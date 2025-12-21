@@ -91,6 +91,24 @@ class XhrInterceptor {
       await hooker.request.response(hooker.resp);
     } catch (error) {}
   }
+  private headersEqual(a: Headers, b: Headers) {
+    if (a === b) return true;
+  
+    const norm = (h) =>
+      [...h.entries()]
+        .map(([k, v]) => [k.toLowerCase(), v])
+        .sort(([k1], [k2]) => k1.localeCompare(k2));
+  
+    const A = norm(a);
+    const B = norm(b);
+  
+    if (A.length !== B.length) return false;
+  
+    for (let i = 0; i < A.length; i++) {
+      if (A[i][0] !== B[i][0] || A[i][1] !== B[i][1]) return false;
+    }
+    return true;
+  }
   private xhrMethodsHandler = {
     open: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return function (...args: Parameters<XMLHttpRequest['open']>) {
@@ -101,7 +119,7 @@ class XhrInterceptor {
           method: args[0] || 'GET',
           url: resolveUrl(args[1]),
           async: args[2] || true,
-          headers: {},
+          headers: new Headers(),
           body: null,
           response: () => {},
         };
@@ -117,12 +135,15 @@ class XhrInterceptor {
       return async function (body: Parameters<XMLHttpRequest['send']>[0]) {
         const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
         hooker.request.body = body ?? null;
-        hooker.request.headers = mapValues(
+        hooker.request.headers = new Headers(mapValues(
           hooker.xhrSetRequestHeadersAfterOpen,
           (val) => val.join(', ')
-        );
+        ));
         const oldRequest = cloneDeep(hooker.request);
-        const newRequest = await hooker.execute(hooker.request, self.hooks);
+        let newRequest = hooker.request;
+        try {
+          newRequest = await hooker.execute(hooker.request, self.hooks);
+        } catch (error) {}
         hooker.request = newRequest;
 
         const needReopen =
@@ -130,25 +151,23 @@ class XhrInterceptor {
           oldRequest.url !== newRequest.url;
 
         const headersChanged =
-          safeStringify(oldRequest.headers) !==
-          safeStringify(newRequest.headers);
+          !self.headersEqual(oldRequest.headers, newRequest.headers)
 
         if (needReopen) {
-          console.log('reopen, bingo');
           self.nativeXhrPrototype.open.apply(target, [
             hooker.request.method,
             hooker.request.url,
             ...(hooker.xhrOpenRestArgs || []),
           ]);
           // 重新 open 后需要重新设置所有 headers
-          for (let [key, val] of Object.entries(hooker.request.headers || {})) {
+          hooker.request.headers.forEach((val, key) => {
             target.setRequestHeader(key, val);
-          }
+          });
         } else if (headersChanged) {
           // 如果只修改了 headers，需要更新已设置的 headers
-          for (let [key, val] of Object.entries(hooker.request.headers || {})) {
+          hooker.request.headers.forEach((val, key) => {
             target.setRequestHeader(key, val);
-          }
+          });
         }
 
         self.nativeXhrPrototype.send.apply(target, [hooker.request.body]);
@@ -390,6 +409,13 @@ class FetchInterceptor {
       };
       return acc;
     }, {});
+
+    const resolveHeaders = (headers: HeadersInit): Headers => {
+      if (headers instanceof Headers) {
+        return headers;
+      }
+      return new Headers(headers);
+    };
     async function proxyFetch(
       req: string | URL | Request,
       options: RequestInit = {}
@@ -398,18 +424,22 @@ class FetchInterceptor {
       const winFetch = self.nativeFetch;
       const hooker = new FetchCycleScheduler();
 
-      const newRequest = await hooker.execute(
-        {
-          type: AJAX_TYPE.FETCH,
-          url: request.url,
-          method: request.method ?? options.method ?? 'GET',
-          // TODO: 这里需要处理 headers 的类型
-          headers: request.headers ?? options.headers ?? null,
-          body: request.body ?? options.body ?? null,
-          response: () => {},
-        },
-        self.hooks
-      );
+      let newRequest = request as AjaxInterceptorRequest;
+      try {
+        newRequest = await hooker.execute(
+          {
+            type: AJAX_TYPE.FETCH,
+            url: request.url,
+            method: request.method ?? options.method ?? 'GET',
+            // TODO: 这里需要处理 headers 的类型
+            headers: resolveHeaders(request.headers ?? options.headers ?? null),
+            body: request.body ?? options.body ?? null,
+            response: () => {},
+          },
+          self.hooks
+        );
+      } catch (error) {}
+
       hooker.request = newRequest;
 
       const fh: Response = await winFetch(
@@ -561,7 +591,10 @@ class CycleScheduler {
   } = {}) {
     this.request = request;
   }
-  async execute(request: AjaxInterceptorRequest, fnList: Function[]): Promise<AjaxInterceptorRequest> {
+  async execute(
+    request: AjaxInterceptorRequest,
+    fnList: Function[]
+  ): Promise<AjaxInterceptorRequest> {
     let result = request;
     for (const fn of fnList) {
       const newResult = await fn(result);
@@ -687,15 +720,15 @@ ajaxInterceptor.hook((request) => {
       console.log(chunk.index, 'chunk.index');
       console.log(chunk.text, 'chunk.text');
 
-      return chunk.text;  // 返回翻译后的文本
+      return chunk.text; // 返回翻译后的文本
     };
-    console.log(request.url,'request.url')
+    console.log(request.url, 'request.url');
     if (request.url.includes('/portal/searchHome')) {
       const body = JSON.parse(request.body as string);
-      console.log(request.body,'req')
-      if(body.code === 'zjcgCategory103') {
-        console.log('12')
-        await new Promise(resolve => setTimeout(resolve, 500));
+      console.log(request.body, 'req');
+      if (body.code === 'zjcgCategory103') {
+        console.log('12');
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
       // const result = JSON.parse(response.response as string);
       // console.log(result, 'result');

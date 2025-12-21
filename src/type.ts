@@ -58,7 +58,7 @@ export interface AjaxInterceptorRequest extends XhrRequest{
   type: AjaxType;
   method: string;
   url: string;
-  headers: Record<string, string>;
+  headers: Headers;
   body: XhrRequestBody | BodyInit
   response: (response: AjaxResponse) => void | Promise<void>
   // 流式响应钩子（可选）
