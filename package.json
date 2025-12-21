@@ -1,15 +1,15 @@
 {
 	"name": "ajax-hooker",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "A plugin for intercepting and modifying AJAX requests",
-	"main": "dist/index.js",
+	"main": "output/index.js",
 	"type": "module",
-	"types": "dist/esm/types/index.d.ts",
+	"types": "output/esm/types/index.d.ts",
 	"exports": {
 		".": {
-			"types": "./dist/esm/types/index.d.ts",
-			"import": "./dist/esm/index.js",
-			"require": "./dist/cjs/index.js"
+			"types": "./output/esm/types/index.d.ts",
+			"import": "./output/esm/index.js",
+			"require": "./output/cjs/index.js"
 		}
 	},
 	"scripts": {

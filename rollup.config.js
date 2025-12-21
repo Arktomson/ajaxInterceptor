@@ -7,12 +7,12 @@ import serve from "rollup-plugin-serve";
 import livereload from "rollup-plugin-livereload";
 
 const isWatch = Boolean(process.env.ROLLUP_WATCH);
-
+const outputDir = isWatch ? "dist" : "output"
 const baseConfig = {
-  input: "src/index.ts",
+  input: isWatch ? "src/demo.ts" : "src/index.ts",
   plugins: [
     clear({
-      targets: ["dist"],
+      targets: [outputDir],
     }),
     nodeResolve(),
     define({
@@ -43,16 +43,16 @@ export default defineConfig({
   output: [
     {
       format: "esm",
-      file: "dist/esm/index.js",
+      file: `${outputDir}/esm/index.js`,
       sourcemap: true,
     },
     {
       format: "cjs",
-      file: "dist/cjs/index.js",
+      file: `${outputDir}/cjs/index.js`,
     },
     {
       format: "iife",
-      file: "dist/iife/index.js",
+      file: `${outputDir}/iife/index.js`,
       name: "ajaxInterceptor",
     },
   ],
