@@ -177,7 +177,7 @@ class XhrInterceptor {
             if (target.readyState === 4) {
               await self.responseProcessor(target);
             }
-            listener(...args);
+            Reflect.apply(listener, this, args);
           };
         }
         target.addEventListener(type, newListener, ...args);
@@ -237,7 +237,7 @@ class XhrInterceptor {
               if (target.readyState === 4) {
                 await self.responseProcessor(target);
               }
-              value(...args);
+              Reflect.apply(value, target, args);
             };
             Reflect.set(target, prop, fn);
             return true; // Proxy set trap 必须返回 true
@@ -412,49 +412,119 @@ class FetchInterceptor {
       );
       hooker.request = newRequest;
 
-      // if (request.body instanceof ReadableStream) {
-      //   console.log('命中',req,options)
-      //   console.log(self.resolveRequest(req, newRequest).duplex,'self.resolveRequest')
-      //   options.duplex = 'half';
-      // }
       const fh: Response = await winFetch(
         self.resolveRequest(req, newRequest),
         self.resolveOptions({ options, newRequest, request: req })
       );
 
-      const [json, text, arrayBuffer, blob, formData] =
-        await Promise.allSettled([
-          fh.clone().json(),
-          fh.clone().text(),
-          fh.clone().arrayBuffer(),
-          fh.clone().blob(),
-          fh.clone().formData(),
-        ]).then((results) =>
-          results.map((result) =>
-            result.status === 'fulfilled' ? result.value : null
-          )
-        );
-      console.log(fh.headers, 'fh.headers');
-      console.log(fh.headers.get('Content-Type'), 'Content-Type');
-      hooker.resp = {
-        status: fh.status,
-        statusText: fh.statusText,
-        ok: fh.ok,
-        headers: fh.headers,
-        finalUrl: fh.url,
-        redirected: fh.redirected,
-        json,
-        text,
-        arrayBuffer,
-        blob,
-        formData,
-      };
-      try {
-        await hooker.request.response(hooker.resp);
-      } catch (error) {}
+      // 检测是否为流式响应
+      const contentType = fh.headers.get('content-type') || '';
+      const isStreamResponse =
+        contentType.includes('text/event-stream') ||
+        contentType.includes('application/stream+json') ||
+        contentType.includes('application/x-ndjson');
 
-      fh[CYCLE_SCHEDULER] = hooker;
-      const proxyFh = new Proxy(fh, {
+      let interceptedResponse: Response = fh;
+
+      // 对于流式响应，创建拦截流
+      if (isStreamResponse && fh.body) {
+        hooker.resp = {
+          status: fh.status,
+          statusText: fh.statusText,
+          ok: fh.ok,
+          headers: fh.headers,
+          finalUrl: fh.url,
+          redirected: fh.redirected,
+        };
+
+        try {
+          await hooker.request.response(hooker.resp);
+        } catch (error) {}
+
+        // 创建 TransformStream 拦截流数据
+        let chunkIndex = 0;
+        const { readable, writable } = new TransformStream({
+          async transform(chunk, controller) {
+            // chunk 是 Uint8Array，包含流数据
+            try {
+              // 解码为文本
+              const decoder = new TextDecoder();
+              const text = decoder.decode(chunk, { stream: true });
+
+              let modifiedText = text;
+
+              // 调用用户自定义的流处理钩子
+              if (hooker.request.onStreamChunk) {
+                const streamChunk = {
+                  text,
+                  raw: chunk,
+                  index: chunkIndex++,
+                  timestamp: Date.now(),
+                };
+
+                const result = await hooker.request.onStreamChunk(streamChunk);
+                // 如果钩子返回了新文本，使用新文本；否则使用原文本
+                if (typeof result === 'string') {
+                  modifiedText = result;
+                }
+                console.log(modifiedText, 'modifiedText');
+              }
+
+              // 重新编码并传递
+              const encoder = new TextEncoder();
+              controller.enqueue(encoder.encode(modifiedText));
+            } catch (error) {
+              // 如果解码失败或钩子出错，直接传递原始数据
+              controller.enqueue(chunk);
+            }
+          },
+        });
+
+        // 将原始流导入到 TransformStream
+        fh.body.pipeTo(writable);
+
+        // 创建新的 Response，使用拦截后的流
+        interceptedResponse = new Response(readable, {
+          status: fh.status,
+          statusText: fh.statusText,
+          headers: fh.headers,
+        });
+      } else if (!isStreamResponse) {
+        // 非流式响应，正常解析 body
+        const [json, text, arrayBuffer, blob, formData] =
+          await Promise.allSettled([
+            fh.clone().json(),
+            fh.clone().text(),
+            fh.clone().arrayBuffer(),
+            fh.clone().blob(),
+            fh.clone().formData(),
+          ]).then((results) =>
+            results.map((result) =>
+              result.status === 'fulfilled' ? result.value : null
+            )
+          );
+
+        hooker.resp = {
+          status: fh.status,
+          statusText: fh.statusText,
+          ok: fh.ok,
+          headers: fh.headers,
+          finalUrl: fh.url,
+          redirected: fh.redirected,
+          json,
+          text,
+          arrayBuffer,
+          blob,
+          formData,
+        };
+
+        try {
+          await hooker.request.response(hooker.resp);
+        } catch (error) {}
+      }
+
+      interceptedResponse[CYCLE_SCHEDULER] = hooker;
+      const proxyFh = new Proxy(interceptedResponse, {
         get(target, prop) {
           const attrHandler = self.getAttrHandler(target, prop as string);
           if (attrHandler) {
@@ -491,7 +561,7 @@ class CycleScheduler {
   } = {}) {
     this.request = request;
   }
-  async execute(request: AjaxInterceptorRequest, fnList: Function[]) {
+  async execute(request: AjaxInterceptorRequest, fnList: Function[]): Promise<AjaxInterceptorRequest> {
     let result = request;
     for (const fn of fnList) {
       const newResult = await fn(result);
@@ -551,6 +621,19 @@ class AjaxInterceptor {
     return AjaxInterceptor.#instance;
   }
   inject() {
+    // 环境兼容性检查
+    if (typeof window === 'undefined') {
+      throw new Error('AjaxInterceptor requires a browser environment');
+    }
+
+    if (!window.XMLHttpRequest) {
+      console.warn('XMLHttpRequest is not supported in this environment');
+    }
+
+    if (!window.fetch) {
+      console.warn('Fetch API is not supported in this environment');
+    }
+
     this.xhrInterceptor.inject();
     this.fetchInterceptor.inject();
   }
@@ -597,12 +680,27 @@ ajaxInterceptor.hook((request) => {
     console.log('bingo');
     request.headers.kpi = '10000';
   }
-  request.response = (response: AjaxResponse) => {
-    if (request.url === '/portal/searchHome') {
-      const result = JSON.parse(response.response as string);
-      console.log(result, 'result');
-      result.result.data.children = result.result.data.children?.slice?.(0, 2);
-      response.response = JSON.stringify(result);
+  request.response = async (response: AjaxResponse) => {
+    request.onStreamChunk = async (chunk) => {
+      console.log(request.url, 'request.url');
+
+      console.log(chunk.index, 'chunk.index');
+      console.log(chunk.text, 'chunk.text');
+
+      return chunk.text;  // 返回翻译后的文本
+    };
+    console.log(request.url,'request.url')
+    if (request.url.includes('/portal/searchHome')) {
+      const body = JSON.parse(request.body as string);
+      console.log(request.body,'req')
+      if(body.code === 'zjcgCategory103') {
+        console.log('12')
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      // const result = JSON.parse(response.response as string);
+      // console.log(result, 'result');
+      // result.result.data.children = result.result.data.children?.slice?.(0, 2);
+      // response.response = JSON.stringify(result);
     }
     if (request.type === 'fetch') {
       console.log(response.headers, 'response.headers');

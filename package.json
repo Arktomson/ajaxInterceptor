@@ -1,12 +1,16 @@
 {
-	"name": "ajax-interceptor",
+	"name": "web-hooker",
 	"version": "1.0.0",
 	"description": "A plugin for intercepting and modifying AJAX requests",
 	"main": "dist/index.js",
 	"type": "module",
 	"scripts": {
 		"build": "rollup -c",
-		"start": "rollup -c -w"
+		"start": "rollup -c -w",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run",
+		"test:coverage": "vitest run --coverage"
 	},
 	"author": "arktomson",
 	"license": "MIT",
@@ -25,13 +29,17 @@
 		"@rollup/plugin-node-resolve": "^16.0.1",
 		"@rollup/plugin-typescript": "^11.1.6",
 		"@types/lodash-es": "^4.17.12",
+		"@types/node": "^25.0.2",
+		"@vitest/ui": "^4.0.15",
+		"jsdom": "^27.3.0",
 		"rollup": "^4.52.2",
 		"rollup-plugin-cleaner": "^1.0.0",
 		"rollup-plugin-clear": "^2.0.7",
 		"rollup-plugin-define": "^1.0.1",
 		"rollup-plugin-livereload": "^2.0.5",
 		"rollup-plugin-serve": "^3.0.0",
-		"typescript": "^5.7.3"
+		"typescript": "^5.7.3",
+		"vitest": "^4.0.15"
 	},
 	"dependencies": {
 		"lodash-es": "^4.17.21"

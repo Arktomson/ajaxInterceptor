@@ -41,10 +41,18 @@ export interface FetchResponse
 export interface AjaxResponse
   extends BaseResponse,
     Partial<XhrResponse & FetchResponse> {}
+
+export interface StreamChunk {
+  text: string;           // 解码后的文本
+  raw: Uint8Array;        // 原始字节数据
+  index: number;          // 数据块索引
+  timestamp: number;      // 接收时间戳
+}
+
 export interface XhrRequest {
   async?: boolean;
 }
-  
+
 type XhrRequestBody = Document | XMLHttpRequestBodyInit | null
 export interface AjaxInterceptorRequest extends XhrRequest{
   type: AjaxType;
@@ -52,9 +60,11 @@ export interface AjaxInterceptorRequest extends XhrRequest{
   url: string;
   headers: Record<string, string>;
   body: XhrRequestBody | BodyInit
-  response: (response: AjaxResponse) => void
+  response: (response: AjaxResponse) => void | Promise<void>
+  // 流式响应钩子（可选）
+  onStreamChunk?: (chunk: StreamChunk) => string | void | Promise<string | void>
 }
 
 export interface HookFunction {
-  (request: AjaxInterceptorRequest): void;
+  (request: AjaxInterceptorRequest): Promise<AjaxInterceptorRequest> | AjaxInterceptorRequest;
 }
