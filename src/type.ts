@@ -28,7 +28,6 @@ export interface FetchResponse
   //   | "json"
   // > 
   {
-  bodyUsed: boolean;
   ok: boolean;
   redirected: boolean;
   text: string;
@@ -59,7 +58,7 @@ export interface AjaxInterceptorRequest extends XhrRequest{
   method: string;
   url: string;
   headers: Headers;
-  body: XhrRequestBody | BodyInit
+  data: XhrRequestBody | BodyInit
   response: (response: AjaxResponse) => void | Promise<void>
   // 流式响应钩子（可选）
   onStreamChunk?: (chunk: StreamChunk) => string | void | Promise<string | void>

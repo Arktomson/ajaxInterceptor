@@ -120,7 +120,7 @@ class XhrInterceptor {
           url: resolveUrl(args[1]),
           async: args[2] || true,
           headers: new Headers(),
-          body: null,
+          data: null,
           response: () => {},
         };
         hooker.xhrOpenRestArgs = args.slice(2);
@@ -134,7 +134,7 @@ class XhrInterceptor {
     send: function (self: XhrInterceptor, target: XMLHttpRequest) {
       return async function (body: Parameters<XMLHttpRequest['send']>[0]) {
         const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
-        hooker.request.body = body ?? null;
+        hooker.request.data = body ?? null;
         hooker.request.headers = new Headers(
           mapValues(hooker.xhrSetRequestHeadersAfterOpen, (val) =>
             val.join(', ')
@@ -173,7 +173,7 @@ class XhrInterceptor {
           });
         }
 
-        self.nativeXhrPrototype.send.apply(target, [hooker.request.body]);
+        self.nativeXhrPrototype.send.apply(target, [hooker.request.data]);
       };
     },
     setRequestHeader: function (self: XhrInterceptor, target: XMLHttpRequest) {
@@ -333,7 +333,7 @@ class FetchInterceptor {
     let url = '';
     let method = null;
     let headers = null;
-    let body = null;
+    let data = null;
     if (typeof req === 'string') {
       url = resolveUrl(req);
     } else if (req instanceof URL) {
@@ -342,13 +342,13 @@ class FetchInterceptor {
       url = resolveUrl(req.url);
       method = req.method ?? null;
       headers = req.headers ?? null;
-      body = req.body ?? null;
+      data = req.body ?? null;
     }
     return {
       url,
       method,
       headers,
-      body,
+      data,
     };
   }
   private resolveRequest(
@@ -384,9 +384,9 @@ class FetchInterceptor {
     return {
       ...(options ? options : {}),
       ...(newRequest.headers ? { headers: newRequest.headers } : {}),
-      ...(newRequest.body ? { body: newRequest.body as BodyInit } : {}),
+      ...(newRequest.data ? { body: newRequest.data as BodyInit } : {}),
       ...(newRequest.method ? { method: newRequest.method } : {}),
-      ...(newRequest.body instanceof ReadableStream ? streamOptions : {}),
+      ...(newRequest.data instanceof ReadableStream ? streamOptions : {}),
     };
   }
   private _generateProxyFetch() {
@@ -436,7 +436,7 @@ class FetchInterceptor {
             method: request.method ?? options.method ?? 'GET',
             // TODO: 这里需要处理 headers 的类型
             headers: resolveHeaders(request.headers ?? options.headers ?? null),
-            body: request.body ?? options.body ?? null,
+            data: request.data ?? options.body ?? null,
             response: () => {},
           },
           self.hooks
