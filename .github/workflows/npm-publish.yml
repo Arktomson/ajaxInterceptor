@@ -65,4 +65,4 @@ jobs:
           echo "包已发布！"
           echo "版本: ${{ steps.version.outputs.version }}"
           echo "类型: ${{ steps.publish.outputs.type }}"
-          echo "URL: https://www.npmjs.com/package/web-hooker/v/${{ steps.version.outputs.version }}"
+          echo "URL: https://www.npmjs.com/package/ajax-hooker/v/${{ steps.version.outputs.version }}"
