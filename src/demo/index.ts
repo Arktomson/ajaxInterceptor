@@ -1,5 +1,5 @@
-import AjaxHooker from './index';
-import { AjaxResponse } from './type';
+import AjaxHooker from '../index';
+import { AjaxResponse } from '../type';
 const ajaxInterceptor: AjaxHooker = AjaxHooker.getInstance();
 
 ajaxInterceptor.inject();

@@ -8,8 +8,9 @@ import livereload from "rollup-plugin-livereload";
 
 const isWatch = Boolean(process.env.ROLLUP_WATCH);
 const outputDir = isWatch ? "dist" : "output"
+const inputFile = isWatch ? "src/demo/index.ts" : "src/index.ts"
 const baseConfig = {
-  input: isWatch ? "src/demo.ts" : "src/index.ts",
+  input: inputFile,
   plugins: [
     clear({
       targets: [outputDir],
