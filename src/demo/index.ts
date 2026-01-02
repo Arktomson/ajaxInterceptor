@@ -6,7 +6,7 @@ ajaxInterceptor.inject();
 let count = 0;
 
 ajaxInterceptor.hook((request) => {
-  console.log(`%c${++count} twices-x200 x9pro`, 'color: red', request);
+  console.log(`%c${++count} twices-x200 x9pro1`, 'color: red', request);
   if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
     const body = JSON.parse(request.body as string);
     body.keyword = '后端';

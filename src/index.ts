@@ -259,10 +259,9 @@ class XhrInterceptor {
               if (target.readyState === 4) {
                 await self.responseProcessor(target);
               }
-              Reflect.apply(value, target, args);
+              Reflect.apply(value, this, args);
             };
-            Reflect.set(target, prop, fn);
-            return true; // Proxy set trap 必须返回 true
+            return Reflect.set(target, prop, fn);
           }
           return Reflect.set(target, prop, value);
         },
