@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import AjaxInterceptor from '../src/index';
 
 describe('业务场景 - 统一添加认证 Token', () => {
@@ -271,7 +271,11 @@ describe('业务场景 - 多钩子协作', () => {
       xhr.onerror = () => resolve(undefined);
     });
 
-    expect(executionOrder).toEqual(['add_token', 'add_timestamp', 'add_device']);
+    expect(executionOrder).toEqual([
+      'add_token',
+      'add_timestamp',
+      'add_device',
+    ]);
   });
 });
 

@@ -4,6 +4,7 @@ import {
   AjaxResponse,
   HookFunction,
   AjaxType,
+  AjaxInterceptorCreateInstanceOptions,
 } from './type';
 import { cloneDeep, isNil, mapValues, pickBy } from 'lodash-es';
 import { getType, resolveUrl, safeStringify } from './utils';
@@ -33,7 +34,7 @@ class XhrInterceptor {
     'statusText',
   ];
   private parseHeaders(
-    obj: string | Headers | Record<string, string> | null | undefined
+    obj: string | Headers | Record<string, string> | null | undefined,
   ): Record<string, string> {
     const headers: Record<string, string> = {};
 
@@ -137,8 +138,8 @@ class XhrInterceptor {
         hooker.request.data = body ?? null;
         hooker.request.headers = new Headers(
           mapValues(hooker.xhrSetRequestHeadersAfterOpen, (val) =>
-            val.join(', ')
-          )
+            val.join(', '),
+          ),
         );
         const oldRequest = cloneDeep(hooker.request);
         let newRequest = hooker.request;
@@ -153,7 +154,7 @@ class XhrInterceptor {
 
         const headersChanged = !self.headersEqual(
           oldRequest.headers,
-          newRequest.headers
+          newRequest.headers,
         );
 
         if (needReopen) {
@@ -306,7 +307,7 @@ class FetchInterceptor {
   static getInstance() {
     if (!FetchInterceptor.#instance) {
       FetchInterceptor.#instance = new FetchInterceptor(
-        FetchInterceptor.#token
+        FetchInterceptor.#token,
       );
     }
     return FetchInterceptor.#instance;
@@ -352,7 +353,7 @@ class FetchInterceptor {
   }
   private resolveRequest(
     req: string | URL | Request,
-    newRequest: AjaxInterceptorRequest
+    newRequest: AjaxInterceptorRequest,
   ): string | URL | Request {
     if (typeof req === 'string') {
       return newRequest.url;
@@ -363,7 +364,7 @@ class FetchInterceptor {
     if (req instanceof Request) {
       return new Request(
         newRequest.url,
-        pickBy(req, (value, key) => key !== 'url' && !isNil(value))
+        pickBy(req, (value, key) => key !== 'url' && !isNil(value)),
       );
     }
     return req;
@@ -399,7 +400,7 @@ class FetchInterceptor {
         };
         return acc;
       },
-      {}
+      {},
     );
 
     this.fetchMethodsHandler = this.fetchMethods.reduce((acc, methodName) => {
@@ -420,7 +421,7 @@ class FetchInterceptor {
     };
     async function proxyFetch(
       req: string | URL | Request,
-      options: RequestInit = {}
+      options: RequestInit = {},
     ) {
       const request = self.normalizeRequest(req);
       const winFetch = self.nativeFetch;
@@ -438,7 +439,7 @@ class FetchInterceptor {
             data: request.data ?? options.body ?? null,
             response: () => {},
           },
-          self.hooks
+          self.hooks,
         );
       } catch (error) {}
 
@@ -446,7 +447,7 @@ class FetchInterceptor {
 
       const fh: Response = await winFetch(
         self.resolveRequest(req, newRequest),
-        self.resolveOptions({ options, newRequest, request: req })
+        self.resolveOptions({ options, newRequest, request: req }),
       );
 
       // 检测是否为流式响应
@@ -532,8 +533,8 @@ class FetchInterceptor {
             fh.clone().formData(),
           ]).then((results) =>
             results.map((result) =>
-              result.status === 'fulfilled' ? result.value : null
-            )
+              result.status === 'fulfilled' ? result.value : null,
+            ),
           );
 
         hooker.resp = {
@@ -595,7 +596,7 @@ class CycleScheduler {
   }
   async execute(
     request: AjaxInterceptorRequest,
-    fnList: Function[]
+    fnList: Function[],
   ): Promise<AjaxInterceptorRequest> {
     let result = request;
     for (const fn of fnList) {
@@ -642,16 +643,22 @@ class AjaxInterceptor {
   static #instance: AjaxInterceptor;
   static #token = Symbol('AjaxInterceptor');
 
-  private constructor(token: Symbol) {
+  private constructor(
+    token: Symbol,
+    options: AjaxInterceptorCreateInstanceOptions = {},
+  ) {
     if (token !== AjaxInterceptor.#token) {
       throw new Error('AjaxInterceptor is a singleton');
     }
     this.xhrInterceptor = XhrInterceptor.getInstance();
     this.fetchInterceptor = FetchInterceptor.getInstance();
   }
-  static getInstance() {
+  static getInstance(options: AjaxInterceptorCreateInstanceOptions = {}) {
     if (!AjaxInterceptor.#instance) {
-      AjaxInterceptor.#instance = new AjaxInterceptor(AjaxInterceptor.#token);
+      AjaxInterceptor.#instance = new AjaxInterceptor(
+        AjaxInterceptor.#token,
+        options,
+      );
     }
     return AjaxInterceptor.#instance;
   }
