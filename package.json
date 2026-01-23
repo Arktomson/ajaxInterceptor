@@ -1,6 +1,6 @@
 {
   "name": "ajax-hooker",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "A plugin for intercepting and modifying AJAX requests",
   "main": "dist/cjs/index.js",
   "type": "module",
