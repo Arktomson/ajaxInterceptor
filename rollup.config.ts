@@ -46,7 +46,8 @@ const config: RollupOptions = {
     }),
     typescript({
       tsconfig: './tsconfig.json',
-      // noEmitOnError: false,
+      include: ['src/**/*'],
+      exclude: ['src/demo/**/*', '**/*.test.ts', '**/*.spec.ts'],
     }),
     ...(terserPlugin ? [terserPlugin] : []),
     ...(servePlugin ? [servePlugin] : []),
@@ -65,7 +66,7 @@ const config: RollupOptions = {
     {
       format: 'iife',
       file: `dist/iife/index.js`,
-      // name: 'ajaxInterceptor',
+      name: 'ajaxInterceptor',
       sourcemap: isDev,
     },
   ],

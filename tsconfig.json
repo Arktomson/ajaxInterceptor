@@ -6,7 +6,7 @@
     "outDir": "dist",
     "declaration": true,
     "declarationDir": "dist/types",
-    "declarationMap": true,
+    "declarationMap": false,
     "sourceMap": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -14,6 +14,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "rollup.config.ts"],
+  "include": ["src/**/*", "rollup.config.ts", "test/**/*"],
   "exclude": ["dist", "node_modules"]
 }
