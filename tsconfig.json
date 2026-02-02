@@ -11,6 +11,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "lib": ["ESNext", "DOM"],
+    "types": ["vitest/globals", "node"],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },

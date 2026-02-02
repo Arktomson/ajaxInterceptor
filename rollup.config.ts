@@ -7,11 +7,12 @@ import serve from 'rollup-plugin-serve';
 import { RollupOptions } from 'rollup';
 
 const isDev = process.env.NODE_ENV === 'development';
+const isProd = process.env.NODE_ENV === 'production';
 console.log(isDev, 'isDev');
 
 const inputFile = isDev ? 'src/demo/index.ts' : 'src/index.ts';
 console.log(inputFile, 'inputFile===');
-const terserPlugin = !isDev
+const terserPlugin = isProd
   ? terser({
       format: {
         comments: false,
@@ -25,7 +26,7 @@ const terserPlugin = !isDev
 
 const servePlugin = isDev
   ? serve({
-      open: true,
+      // open: true,
       verbose: true,
       contentBase: ['dist'],
       host: 'localhost',
@@ -46,8 +47,7 @@ const config: RollupOptions = {
     }),
     typescript({
       tsconfig: './tsconfig.json',
-      include: ['src/**/*'],
-      exclude: ['src/demo/**/*', '**/*.test.ts', '**/*.spec.ts'],
+      exclude: !isDev ? ['src/demo/**/*', 'rollup.config.ts', 'test/**/*'] : [],
     }),
     ...(terserPlugin ? [terserPlugin] : []),
     ...(servePlugin ? [servePlugin] : []),

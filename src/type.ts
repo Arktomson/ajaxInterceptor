@@ -1,29 +1,18 @@
 import type { AjaxType } from './constant';
+import type { Writable } from 'type-fest';
 export type { AjaxType };
 
-interface BaseResponse {
-  status: number;
-  statusText: string;
-  headers: Headers;
+export type ActionType = 'inject' | 'uninject';
+interface BaseResponse
+  extends Writable<Pick<Response, 'status' | 'statusText'>>,
+    Pick<Response, 'headers'> {
   finalUrl: string;
 }
-export interface XhrResponse {
-  response: string | Record<string, any> | Blob | ArrayBuffer | Document;
-}
+export interface XhrResponse
+  extends Writable<Pick<XMLHttpRequest, 'response' | 'responseText' | 'responseXML'>> {}
 
-export interface FetchResponse {
-  // extends Pick<
-  //   Response,
-  //   | "ok"
-  //   | "redirected"
-  //   | "text"
-  //   | "arrayBuffer"
-  //   | "blob"
-  //   | "formData"
-  //   | "json"
-  // >
-  ok: boolean;
-  redirected: boolean;
+export interface FetchResponse
+  extends Pick<Response, 'ok' | 'redirected'> {
   text: string;
   arrayBuffer: ArrayBuffer;
   blob: Blob;
@@ -41,17 +30,19 @@ export interface StreamChunk {
   timestamp: number; // 接收时间戳
 }
 
-export interface XhrRequest {
-  async?: boolean;
-}
+export interface XhrRequest
+  extends Partial<
+    Pick<XMLHttpRequest, 'responseType' | 'withCredentials' | 'timeout'>
+  > {}
 
 type XhrRequestBody = Document | XMLHttpRequestBodyInit | null;
+type FetchRequestBody = BodyInit | null;
 export interface AjaxInterceptorRequest extends XhrRequest {
   type: AjaxType;
   method: string;
   url: string;
   headers: Headers;
-  data: XhrRequestBody | BodyInit;
+  data: XhrRequestBody | FetchRequestBody;
   response: (response: AjaxResponse) => void | Promise<void>;
   // 流式响应钩子（可选）
   onStreamChunk?: (
@@ -62,7 +53,7 @@ export interface AjaxInterceptorRequest extends XhrRequest {
 export interface HookFunction {
   (
     request: AjaxInterceptorRequest,
-  ): Promise<AjaxInterceptorRequest> | AjaxInterceptorRequest;
+  ): Promise<AjaxInterceptorRequest | void> | AjaxInterceptorRequest | void;
 }
 
 export interface AjaxInterceptorCreateInstanceOptions {

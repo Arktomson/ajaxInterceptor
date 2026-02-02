@@ -4,10 +4,27 @@ const ajaxInterceptor: AjaxHooker = AjaxHooker.getInstance();
 console.log(ajaxInterceptor, 'ajaxInterceptor');
 
 ajaxInterceptor.inject();
+// ajaxInterceptor.inject('fetch');
 let count = 0;
 
+let testUrl = 'https://jsonplaceholder.typicode.com'
 ajaxInterceptor.hook((request) => {
-  console.log(`%c${++count} twices-x200 x300111`, 'color: red', request);
+  console.log(`%c${++count} twices-oppox9pro1`, 'color: red', request);
+  if(request.url.startsWith(testUrl) || request.url.startsWith('http://localhost')) {
+    request.responseType = 'json';
+    request.headers.append('csz','1')
+    request.headers.append('csz','2')
+  }
+  request.response = async (response: AjaxResponse) => {
+    if(response.status === 401) {
+      response.status = 200;
+      response.statusText = 'OK';
+      response.response = {
+        name: '已缓存'
+      }
+    }
+    console.log(response, 'response.json')
+  }
   // if (request.url === '/api/outer/ats-apply/website/jobs/v2') {
   //   const body = JSON.parse(request.body as string);
   //   body.keyword = '后端';

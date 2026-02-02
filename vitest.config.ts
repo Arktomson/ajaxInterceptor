@@ -6,7 +6,10 @@ export default defineConfig({
     environment: 'jsdom',
 
     // 测试文件匹配模式
-    include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
+    include: ['test/**/*.test.ts'],
+
+    // 测试启动前执行的 setup 文件
+    setupFiles: ['./test/setup.ts'],
 
     // 覆盖率配置
     coverage: {

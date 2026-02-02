@@ -1,43 +1,45 @@
 # ajax-hooker
 
-一个轻量级的 AJAX 请求拦截器,支持拦截和修改 XMLHttpRequest 和 Fetch 请求。
+English | [中文](./README.zh-CN.md)
 
-## 特性
+A lightweight AJAX request interceptor that supports intercepting and modifying both XMLHttpRequest and Fetch requests.
 
-- 🎯 同时支持 XMLHttpRequest 和 Fetch API
-- 🔄 可拦截和修改请求参数(URL、Method、Headers、Body)
-- 📦 可捕获响应数据
-- 🌊 支持流式响应拦截(SSE、流式 JSON 等)
-- 🪝 支持多个钩子函数链式执行
-- 🔒 单例模式,确保全局唯一实例
-- 📝 完整的 TypeScript 类型支持
+## Features
 
-## 安装
+- Works with both XMLHttpRequest and Fetch API
+- Intercepts and modifies request parameters (URL, Method, Headers, Body)
+- Captures response data
+- Supports streaming response interception (SSE, NDJSON, streaming JSON, etc.)
+- Chain multiple hook functions
+- Singleton pattern ensures a single global instance
+- Full TypeScript type support
+
+## Installation
 
 ```bash
 npm install ajax-hooker
 ```
 
-## 快速开始
+## Quick Start
 
 ```typescript
 import AjaxInterceptor from 'ajax-hooker';
 
-// 获取拦截器实例
+// Get the interceptor instance
 const interceptor = AjaxInterceptor.getInstance();
 
-// 注入拦截器
+// Inject the interceptor
 interceptor.inject();
 
-// 添加钩子函数
+// Add a hook
 interceptor.hook((request) => {
-  // 修改请求
+  // Modify the request
   request.headers.set('Authorization', 'Bearer token');
 
-  // 捕获响应
+  // Capture the response
   request.response = async (response) => {
-    console.log('响应状态:', response.status);
-    console.log('响应数据:', response.json);
+    console.log('Status:', response.status);
+    console.log('Data:', response.json);
   };
 
   return request;
@@ -48,85 +50,143 @@ interceptor.hook((request) => {
 
 ### AjaxInterceptor.getInstance()
 
-获取拦截器单例实例。
+Get the singleton interceptor instance.
 
 ```typescript
 const interceptor = AjaxInterceptor.getInstance();
 ```
 
-### inject()
+### inject(type?)
 
-注入拦截器,开始拦截请求。
+Inject the interceptor and start intercepting requests.
+
+**Parameters:**
+- `type`: Optional. Specify `'xhr'` or `'fetch'` to inject only one type. If omitted, both are injected.
 
 ```typescript
+// Inject all
 interceptor.inject();
+
+// Only XHR
+interceptor.inject('xhr');
+
+// Only Fetch
+interceptor.inject('fetch');
 ```
 
-### uninject()
+### uninject(type?)
 
-移除拦截器,恢复原始的 XMLHttpRequest 和 Fetch。
+Remove the interceptor and restore native XMLHttpRequest and Fetch.
+
+**Parameters:**
+- `type`: Optional. Specify `'xhr'` or `'fetch'` to remove only one type. If omitted, both are removed.
 
 ```typescript
+// Remove all
 interceptor.uninject();
+
+// Only remove XHR
+interceptor.uninject('xhr');
 ```
 
 ### hook(fn, type?)
 
-添加钩子函数。
+Add a hook function.
 
-**参数:**
-- `fn`: 钩子函数,接收请求对象并返回修改后的请求对象
-- `type`: 可选,指定拦截类型 `'xhr'` 或 `'fetch'`,不指定则同时拦截两者
+**Parameters:**
+- `fn`: Hook function that receives a request object and returns the modified request (can also return nothing, in which case the original request is kept unchanged)
+- `type`: Optional. Specify `'xhr'` or `'fetch'` to intercept only one type. If omitted, both are intercepted.
 
 ```typescript
-// 拦截所有请求
+// Intercept all requests
 interceptor.hook((request) => {
-  console.log('请求:', request.url);
+  console.log('Request:', request.url);
   return request;
 });
 
-// 只拦截 XHR 请求
+// Only XHR
 interceptor.hook((request) => {
-  console.log('XHR 请求:', request.url);
+  console.log('XHR:', request.url);
   return request;
 }, 'xhr');
 
-// 只拦截 Fetch 请求
+// Only Fetch
 interceptor.hook((request) => {
-  console.log('Fetch 请求:', request.url);
+  console.log('Fetch:', request.url);
   return request;
 }, 'fetch');
 ```
 
-## 请求对象结构
+## Request Object (AjaxInterceptorRequest)
 
-钩子函数接收的请求对象包含以下属性:
+The request object received by hook functions contains the following properties:
+
+| Property | Type | Access | Description |
+|----------|------|--------|-------------|
+| `type` | `'xhr' \| 'fetch'` | Read-only | Request type, identifies the request source |
+| `method` | `string` | **Writable** | HTTP method (GET, POST, etc.) |
+| `url` | `string` | **Writable** | Request URL |
+| `headers` | `Headers` | **Writable** | Request headers, standard [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) object |
+| `data` | `any` | **Writable** | Request body |
+| `response` | `(response: AjaxResponse) => void \| Promise<void>` | **Writable** | Response callback, invoked when the response is received |
+| `onStreamChunk` | `(chunk: StreamChunk) => string \| void \| Promise<string \| void>` | **Writable** | Streaming response hook (optional), used to intercept each chunk of a streaming response |
+| `responseType` | `XMLHttpRequestResponseType` | **Writable** | XHR only. Corresponds to `xhr.responseType` |
+| `withCredentials` | `boolean` | **Writable** | XHR only. Corresponds to `xhr.withCredentials` |
+| `timeout` | `number` | **Writable** | XHR only. Corresponds to `xhr.timeout` |
 
 ```typescript
 interface AjaxInterceptorRequest {
-  type: 'xhr' | 'fetch';           // 请求类型
-  method: string;                   // 请求方法
-  url: string;                      // 请求 URL
-  headers: Headers;                 // 请求头
-  data: any;                        // 请求体
-  response: (response: AjaxResponse) => void | Promise<void>;  // 响应回调
-  onStreamChunk?: (chunk: StreamChunk) => string | void | Promise<string | void>;  // 流式响应钩子
+  type: 'xhr' | 'fetch';
+  method: string;
+  url: string;
+  headers: Headers;
+  data: any;
+  response: (response: AjaxResponse) => void | Promise<void>;
+  onStreamChunk?: (chunk: StreamChunk) => string | void | Promise<string | void>;
+  // XHR-specific properties
+  responseType?: XMLHttpRequestResponseType;
+  withCredentials?: boolean;
+  timeout?: number;
 }
 ```
 
-## 响应对象结构
+## Response Object (AjaxResponse)
+
+The response object received by the response callback contains the following properties:
+
+| Property | Type | Access | Description |
+|----------|------|--------|-------------|
+| `status` | `number` | **Writable** | HTTP status code |
+| `statusText` | `string` | **Writable** | HTTP status text |
+| `headers` | `Headers` | Read-only | Response headers |
+| `finalUrl` | `string` | Read-only | Final URL (after redirects) |
+| `response` | `any` | **Writable** | XHR only. Corresponds to `xhr.response` |
+| `responseText` | `string` | **Writable** | XHR only. Corresponds to `xhr.responseText` |
+| `responseXML` | `Document \| null` | **Writable** | XHR only. Corresponds to `xhr.responseXML` |
+| `ok` | `boolean` | Read-only | Fetch only. Whether the request was successful (status 200-299) |
+| `redirected` | `boolean` | Read-only | Fetch only. Whether the request was redirected |
+| `json` | `any` | Read-only | Fetch only. Parsed JSON data |
+| `text` | `string` | Read-only | Fetch only. Response text |
+| `arrayBuffer` | `ArrayBuffer` | Read-only | Fetch only. Response ArrayBuffer |
+| `blob` | `Blob` | Read-only | Fetch only. Response Blob |
+| `formData` | `FormData` | Read-only | Fetch only. Response FormData |
+
+> **Note:** For Fetch responses, `json`, `text`, `arrayBuffer`, `blob`, and `formData` are automatically parsed by the interceptor and available as properties. No need to call `.json()` or similar methods. If parsing fails, the corresponding property is `null`.
 
 ```typescript
 interface AjaxResponse {
-  status: number;                   // 状态码
-  statusText: string;               // 状态文本
-  headers: Headers;                 // 响应头
-  finalUrl: string;                 // 最终 URL
+  // Common properties
+  status: number;          // Writable
+  statusText: string;      // Writable
+  headers: Headers;        // Read-only
+  finalUrl: string;
 
-  // XHR 响应
+  // XHR-specific (Writable)
   response?: any;
+  responseText?: string;
+  responseXML?: Document | null;
 
-  // Fetch 响应
+  // Fetch-specific (Read-only, auto-parsed)
   ok?: boolean;
   redirected?: boolean;
   json?: any;
@@ -137,9 +197,44 @@ interface AjaxResponse {
 }
 ```
 
-## 使用示例
+## Stream Chunk (StreamChunk)
 
-### 修改请求 URL
+The chunk object received by the `onStreamChunk` hook:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `text` | `string` | Decoded text content |
+| `raw` | `Uint8Array` | Raw byte data |
+| `index` | `number` | Chunk index (starting from 0) |
+| `timestamp` | `number` | Receive timestamp |
+
+```typescript
+interface StreamChunk {
+  text: string;
+  raw: Uint8Array;
+  index: number;
+  timestamp: number;
+}
+```
+
+## Streaming Response Auto-Detection
+
+The interceptor automatically detects streaming responses based on the `Content-Type` response header. The following types are recognized as streaming responses:
+
+- `text/event-stream` (SSE)
+- `application/stream+json`
+- `application/x-ndjson`
+- `application/jsonl`
+- `application/json-seq`
+
+When a streaming response is detected:
+1. The `response` callback is invoked immediately (containing only `status`, `statusText`, `ok`, `headers`, `finalUrl`, `redirected` — no body data)
+2. Stream data is passed chunk by chunk via the `onStreamChunk` hook
+3. Returning a `string` from `onStreamChunk` modifies the chunk content; returning `void` or nothing keeps the original content
+
+## Examples
+
+### Rewrite Request URL
 
 ```typescript
 interceptor.hook((request) => {
@@ -150,7 +245,7 @@ interceptor.hook((request) => {
 });
 ```
 
-### 添加认证 Token
+### Add Auth Token
 
 ```typescript
 interceptor.hook((request) => {
@@ -159,74 +254,97 @@ interceptor.hook((request) => {
 });
 ```
 
-### 捕获响应数据
+### Capture Response Data
 
 ```typescript
 interceptor.hook((request) => {
   request.response = async (response) => {
-    console.log('状态码:', response.status);
-    console.log('响应数据:', response.json || response.response);
+    console.log('Status:', response.status);
+    // XHR uses response.response, Fetch uses response.json
+    console.log('Data:', response.json || response.response);
   };
   return request;
 });
 ```
 
-### 拦截流式响应
+### Modify XHR Properties
 
 ```typescript
 interceptor.hook((request) => {
-  // 拦截流式响应的每个数据块
-  request.onStreamChunk = async (chunk) => {
-    console.log('收到数据块:', chunk.text);
-    console.log('数据块索引:', chunk.index);
+  // Change response type
+  request.responseType = 'json';
+  // Set timeout
+  request.timeout = 5000;
+  // Send credentials
+  request.withCredentials = true;
+  return request;
+}, 'xhr');
+```
 
-    // 可以修改数据块内容
+### Intercept Streaming Responses
+
+```typescript
+interceptor.hook((request) => {
+  // Response headers are available immediately when the stream starts
+  request.response = async (response) => {
+    console.log('Stream started, status:', response.status);
+  };
+
+  // Intercept each chunk of the streaming response
+  request.onStreamChunk = async (chunk) => {
+    console.log('Chunk:', chunk.text);
+    console.log('Raw data:', chunk.raw);
+    console.log('Index:', chunk.index);
+    console.log('Timestamp:', chunk.timestamp);
+
+    // Return modified text to replace the chunk content
     return chunk.text.replace('old', 'new');
+
+    // Return void or nothing to keep the original content
   };
 
   return request;
 });
 ```
 
-### 多个钩子链式执行
+### Multiple Hooks in Sequence
 
 ```typescript
-// 第一个钩子:添加 token
+// First hook: add token
 interceptor.hook((request) => {
   request.headers.set('Authorization', 'Bearer token');
   return request;
 });
 
-// 第二个钩子:添加时间戳
+// Second hook: add timestamp
 interceptor.hook((request) => {
   request.headers.set('X-Timestamp', Date.now().toString());
   return request;
 });
 
-// 第三个钩子:记录日志
+// Third hook: log (no return value, keeps original request)
 interceptor.hook((request) => {
   console.log(`${request.method} ${request.url}`);
-  return request;
 });
 ```
 
-## 开发
+## Development
 
 ```bash
-# 安装依赖
-npm install
+# Install dependencies
+pnpm install
 
-# 开发模式
-npm start
+# Dev mode
+pnpm dev
 
-# 构建
-npm run build
+# Build
+pnpm build
 
-# 测试
-npm test
+# Test
+pnpm test
 
-# 测试覆盖率
-npm run test:coverage
+# Test coverage
+pnpm test:coverage
 ```
 
 ## License

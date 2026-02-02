@@ -1,0 +1,142 @@
+name: 发布
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: '额外的发布备注（可选，支持 Markdown）'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # ---- 环境准备 ----
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # ---- 前置检查（不修改任何东西）----
+      - name: 运行测试
+        run: pnpm run test:run
+
+      - name: 检查是否有待处理的 changesets
+        run: |
+          CHANGESET_FILES=$(find .changeset -name '*.md' ! -name 'README.md' | head -1)
+          if [ -z "$CHANGESET_FILES" ]; then
+            echo "::error::没有待处理的 changesets，请先运行 pnpm changeset 创建变更记录"
+            exit 1
+          fi
+
+      - name: 构建项目（提前验证构建是否通过）
+        run: pnpm run build
+
+      # ---- 版本更新（本地文件变更）----
+      - name: 获取当前版本
+        id: prev_version
+        run: |
+          PREV_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PREV_VERSION" >> $GITHUB_OUTPUT
+
+      - name: 消费 changesets 并更新版本
+        run: pnpm run version-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 获取新版本
+        id: new_version
+        run: |
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: 提取 CHANGELOG 中本次版本的变更记录
+        run: |
+          VERSION="${{ steps.new_version.outputs.version }}"
+          awk "/^## ${VERSION}/,/^## [0-9]/" CHANGELOG.md | head -n -1 | tail -n +2 > /tmp/changelog_content.txt
+
+      - name: 生成 commit 列表
+        run: |
+          PREV_TAG="v${{ steps.prev_version.outputs.version }}"
+          if git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
+            git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges > /tmp/commit_log.txt
+          else
+            git log -20 --pretty=format:"- %s (%h)" --no-merges > /tmp/commit_log.txt
+          fi
+
+      # ---- 重新构建（使用更新后的版本号）----
+      - name: 构建项目
+        run: pnpm run build
+
+      # ---- 发布阶段：先推代码，再发 npm ----
+      # 顺序说明：
+      #   1. git push 先行 → 失败则什么都没发出去，安全重试
+      #   2. npm publish 后行 → 失败则代码已推但 npm 没发，手动补发即可
+      #   3. GitHub Release 最后 → 失败只是缺个页面，手动补即可
+      - name: 提交版本变更并推送
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): v${{ steps.new_version.outputs.version }}"
+          git tag "v${{ steps.new_version.outputs.version }}"
+          git push --atomic origin master "v${{ steps.new_version.outputs.version }}"
+
+      - name: 发布到 npm
+        run: pnpm changeset publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 组装 Release Body
+        run: |
+          VERSION="${{ steps.new_version.outputs.version }}"
+          {
+            cat /tmp/changelog_content.txt
+            echo ""
+            if [ -n "$RELEASE_NOTES" ]; then
+              echo "## 备注"
+              echo ""
+              echo "$RELEASE_NOTES"
+              echo ""
+            fi
+            echo "---"
+            echo ""
+            echo "### Commits"
+            echo ""
+            cat /tmp/commit_log.txt
+            echo ""
+            echo ""
+            echo "**npm**: https://www.npmjs.com/package/ajax-hooker/v/${VERSION}"
+          } > /tmp/release_body.md
+        env:
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.new_version.outputs.version }}"
+          name: "v${{ steps.new_version.outputs.version }}"
+          body_path: /tmp/release_body.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,8 @@
 export const AJAX_TYPE = {
   XHR: "xhr",
   FETCH: "fetch",
+  // TODO SSE
+  // SSE: "sse",
 } as const;
 
 export type AjaxType = (typeof AJAX_TYPE)[keyof typeof AJAX_TYPE];

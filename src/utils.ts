@@ -8,13 +8,6 @@ export const getType = Object.prototype.toString.call.bind(
 );
 
 export const resolveUrl = (url: string | URL = '') => {
-  if (url instanceof URL) {
-    return url.toString();
-  }
-  const isAbsolute = url.startsWith('http');
-  if(isAbsolute) {
-    return url;
-  }
   return new URL(url, window.location.origin).toString();
 };
 
@@ -27,4 +20,29 @@ export const safeStringify = (value: any) => {
   } catch (error) {
     return '';
   }
+};
+
+export const getProxyValue = (target: object, prop: string | symbol) => {
+  const value = Reflect.get(target, prop);
+  if (typeof value !== 'function') {
+    return value;
+  }
+  return function (...args: any[]) {
+    return Reflect.apply(value as (...params: any[]) => any, target, args);
+  };
+};
+
+export const copyNativePropsAndPrototype = ({
+  source,
+  target,
+  prototype,
+}: {
+  source: Record<string, any>;
+  target: Record<string, any>;
+  prototype: object;
+}) => {
+  Object.keys(source).forEach((key) => {
+    target[key] = source[key];
+  });
+  target.prototype = prototype;
 };
