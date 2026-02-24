@@ -72,16 +72,21 @@ jobs:
       - name: 提取 CHANGELOG 中本次版本的变更记录
         run: |
           VERSION="${{ steps.new_version.outputs.version }}"
-          awk "/^## ${VERSION}/,/^## [0-9]/" CHANGELOG.md | head -n -1 | tail -n +2 > /tmp/changelog_content.txt
+          awk "/^## ${VERSION}/{found=1; next} /^## /{found=0} found" CHANGELOG.md > /tmp/changelog_content.txt
 
       - name: 生成 commit 列表
         run: |
           PREV_TAG="v${{ steps.prev_version.outputs.version }}"
+          WORDS=("Thanks" "Kudos" "Cheers" "Props" "Shoutout to")
           if git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
-            git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges > /tmp/commit_log.txt
+            FORMAT="${PREV_TAG}..HEAD"
           else
-            git log -20 --pretty=format:"- %s (%h)" --no-merges > /tmp/commit_log.txt
+            FORMAT="-20"
           fi
+          git log $FORMAT --pretty=format:"%s (%h) |%an" --no-merges | while IFS='|' read -r MSG AUTHOR; do
+            WORD="${WORDS[$((RANDOM % ${#WORDS[@]}))]}"
+            echo "- ${MSG} — ${WORD} @${AUTHOR}!"
+          done > /tmp/commit_log.txt
 
       # ---- 重新构建（使用更新后的版本号）----
       - name: 构建项目
