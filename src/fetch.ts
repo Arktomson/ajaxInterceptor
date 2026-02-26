@@ -6,6 +6,15 @@ import {
   resolveUrl,
 } from './utils';
 import { AJAX_TYPE, CYCLE_SCHEDULER } from './constant';
+
+type PropertySource = 'request' | 'options' | 'default';
+
+interface SourceMap {
+  method: PropertySource;
+  headers: PropertySource;
+  data: PropertySource;
+}
+
 class FetchCycleScheduler extends CycleScheduler {
   constructor({
     req = {} as AjaxInterceptorRequest,
@@ -99,35 +108,97 @@ export class FetchInterceptor {
   private resolveRequest(
     req: string | URL | Request,
     newRequest: AjaxInterceptorRequest,
+    sourceMap: SourceMap,
   ): string | URL | Request {
+    const urlChanged =
+      (typeof req === 'string' && newRequest.url !== req) ||
+      (req instanceof URL && newRequest.url !== req.href) ||
+      (req instanceof Request && newRequest.url !== req.url);
+
     if (typeof req === 'string') {
-      return newRequest.url;
+      return urlChanged ? newRequest.url : req;
     }
     if (req instanceof URL) {
-      return new URL(newRequest.url);
+      return urlChanged ? new URL(newRequest.url) : req;
     }
     if (req instanceof Request) {
-      return new Request(newRequest.url, req);
+      const needsNewRequest =
+        urlChanged ||
+        (sourceMap.method === 'request' && newRequest.method !== req.method) || // 原始 method 在 request 里，但被修改了
+        (sourceMap.headers === 'request' &&
+          newRequest.headers !== req.headers) || // headers 被修改
+        (sourceMap.data === 'request' && newRequest.data !== req.body); // body 被修改
+
+      if (needsNewRequest) {
+        const methodChanged = sourceMap.method === 'request' && newRequest.method !== req.method;
+        const headersChanged = sourceMap.headers === 'request' && newRequest.headers !== req.headers;
+        const bodyChanged = sourceMap.data === 'request' && newRequest.data !== req.body;
+
+        return new Request(urlChanged ? newRequest.url : req, {
+          ...(methodChanged && { method: newRequest.method }),
+          ...(headersChanged && { headers: newRequest.headers }),
+          ...(bodyChanged && { body: newRequest.data as BodyInit }),
+        });
+      }
+      return req;
     }
     return req;
   }
   private resolveOptions({
     options,
     newRequest,
+    sourceMap,
   }: {
     options?: RequestInit;
     newRequest: AjaxInterceptorRequest;
+    sourceMap: SourceMap;
   }) {
-    const streamOptions = {
-      duplex: 'half',
-    };
-    return {
-      ...options,
-      headers: newRequest.headers,
-      body: newRequest.data as BodyInit,
-      method: newRequest.method,
-      ...(newRequest.data instanceof ReadableStream ? streamOptions : {}),
-    };
+    // 保留非拦截属性（credentials, signal, mode, cache 等）
+    const { method: _, headers: __, body: ___, ...rest } = options || {};
+    const resolved: RequestInit = { ...rest };
+
+    // method: 来自 options → 始终写入 init；来自 default 且被修改 → 写入 init
+    if (
+      sourceMap.method === 'options' ||
+      (sourceMap.method === 'default' &&
+        newRequest.method !== (options?.method ?? 'GET'))
+    ) {
+      resolved.method = newRequest.method;
+    }
+
+    // headers: 来自 options → 始终写入 init；来自 default 且被修改 → 写入 init
+    if (sourceMap.headers === 'options') {
+      resolved.headers = newRequest.headers;
+    } else if (sourceMap.headers === 'default') {
+      let isHeadersEmpty = true;
+      if (newRequest.headers instanceof Headers) {
+        let count = 0;
+        newRequest.headers.forEach(() => {
+          count++;
+        });
+        isHeadersEmpty = count === 0;
+      } else if (newRequest.headers) {
+        isHeadersEmpty = Object.keys(newRequest.headers).length === 0;
+      }
+      if (!isHeadersEmpty) {
+        resolved.headers = newRequest.headers;
+      }
+    }
+
+    // body/data: 来自 options → 始终写入 init；来自 default 且被修改 → 写入 init
+    if (
+      sourceMap.data === 'options' ||
+      (sourceMap.data === 'default' &&
+        newRequest.data !== (options?.body ?? null))
+    ) {
+      resolved.body = newRequest.data as BodyInit;
+    }
+
+    if (newRequest.data instanceof ReadableStream) {
+      (resolved as any).duplex = 'half';
+    }
+
+    return resolved;
   }
   private resolveHeaders(headers: HeadersInit): Headers {
     if (headers instanceof Headers) {
@@ -146,21 +217,41 @@ export class FetchInterceptor {
       const winFetch = self.nativeFetch;
       const hooker = new FetchCycleScheduler();
 
-      let newRequest = request as AjaxInterceptorRequest;
+      // 追踪每个属性的来源
+      const sourceMap: SourceMap = {
+        method: 'default',
+        headers: 'default',
+        data: 'default',
+      };
+
+      // Request 对象上的属性
+      if (req instanceof Request) {
+        sourceMap.method = 'request';
+        sourceMap.headers = 'request';
+        if (req.body !== null) sourceMap.data = 'request';
+      }
+
+      // options 中的属性（优先级更高，覆盖 Request）
+      if (options.method !== undefined) sourceMap.method = 'options';
+      if (options.headers !== undefined) sourceMap.headers = 'options';
+      if (options.body !== undefined) sourceMap.data = 'options';
+
+      const originalRequest: AjaxInterceptorRequest = {
+        type: AJAX_TYPE.FETCH,
+        url: request.url,
+        method: options.method ?? request.method ?? 'GET',
+        headers: self.resolveHeaders(
+          options.headers ?? request.headers ?? new Headers(),
+        ),
+        data: options.body ?? request.data ?? null,
+        response: () => {},
+      };
+
+
+
+      let newRequest = originalRequest;
       try {
-        newRequest = await hooker.execute(
-          {
-            type: AJAX_TYPE.FETCH,
-            url: request.url,
-            method: options.method ?? request.method ?? 'GET',
-            headers: self.resolveHeaders(
-              options.headers ?? request.headers ?? new Headers(),
-            ),
-            data: options.body ?? request.data ?? null,
-            response: () => {},
-          },
-          self.hooks,
-        );
+        newRequest = await hooker.execute(originalRequest, self.hooks);
       } catch (error) {
         console.warn('[AjaxInterceptor] Error in fetch request hooks:', error);
       }
@@ -168,8 +259,8 @@ export class FetchInterceptor {
       hooker.req = newRequest;
 
       const fh: Response = await winFetch(
-        self.resolveRequest(req, newRequest),
-        self.resolveOptions({ options, newRequest }),
+        self.resolveRequest(req, newRequest, sourceMap),
+        self.resolveOptions({ options, newRequest, sourceMap }),
       );
 
       // 检测是否为流式响应
