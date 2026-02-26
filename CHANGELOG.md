@@ -1,5 +1,19 @@
 # ajax-hooker
 
+## 1.1.1 (2026-02-26)
+
+### 🇺🇸 English
+
+- feat: Refactor release pipeline to automate bilingual changelogs without changesets ([e8cb192](https://github.com/Arktomson/ajaxInterceptor/commit/e8cb192)) [@arktomson](https://github.com/arktomson)
+- feat: 增强 fetch 拦截器，通过跟踪请求属性来源更精确地解析和重构请求。 ([7c58112](https://github.com/Arktomson/ajaxInterceptor/commit/7c58112)) [@arktomson](https://github.com/arktomson)
+- chore: 修复 release workflow CHANGELOG 提取逻辑 & 优化 commit 列表格式 ([f91be01](https://github.com/Arktomson/ajaxInterceptor/commit/f91be01)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- feat: 重构发版流水线 ([e8cb192](https://github.com/Arktomson/ajaxInterceptor/commit/e8cb192)) [@arktomson](https://github.com/arktomson)
+- feat: 增强 fetch 拦截器，通过跟踪请求属性来源更精确地解析和重构请求。 ([7c58112](https://github.com/Arktomson/ajaxInterceptor/commit/7c58112)) [@arktomson](https://github.com/arktomson)
+- chore: 修复 release workflow CHANGELOG 提取逻辑 & 优化 commit 列表格式 ([f91be01](https://github.com/Arktomson/ajaxInterceptor/commit/f91be01)) [@arktomson](https://github.com/arktomson)
+
 ## 1.1.0
 
 ### Minor Changes
