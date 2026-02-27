@@ -11,8 +11,7 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
 
-  interceptor.xhrInterceptor.hooks = [];
-  interceptor.fetchInterceptor.hooks = [];
+  interceptor.unhook();
   interceptor.uninject();
   interceptor.inject();
 });

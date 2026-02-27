@@ -2,13 +2,19 @@
 
 [English](./README.md) | 中文
 
-一个轻量级的 AJAX 请求拦截器,支持拦截和修改 XMLHttpRequest 和 Fetch 请求。
+`ajax-hooker` 是一个浏览器端 AJAX 拦截库。它会对原生 `XMLHttpRequest` 和 `fetch` 做深度劫持,并把两者抹平为统一的 Hook 生命周期,让拦截逻辑写一次即可复用。
+
+## 项目亮点
+
+- 深度 AJAX 劫持: 直接拦截 XHR 与 Fetch 的关键阶段,而不是只包裹业务层请求函数。
+- 统一请求生命周期: 抹平 XHR/Fetch 差异,聚合为两个核心阶段: 请求前(请求参数改写)与请求后(响应处理)。
+- 流式能力完整: 支持对流式响应进行逐块拦截和改写。
 
 ## 特性
 
-- 同时支持 XMLHttpRequest 和 Fetch API
-- 可拦截和修改请求参数(URL、Method、Headers、Body)
-- 可捕获响应数据
+- 同时支持 `XMLHttpRequest` 和 `fetch`
+- 可拦截和修改请求参数(`url`、`method`、`headers`、`data`)
+- 通过统一回调模型捕获响应数据
 - 支持流式响应拦截(SSE、NDJSON、streaming JSON 等)
 - 支持多个钩子函数链式执行
 - 单例模式,确保全局唯一实例
@@ -45,6 +51,72 @@ interceptor.hook((request) => {
   return request;
 });
 ```
+
+## API 变动示例 (v1.1+)
+
+### 统一的请求前/请求后生命周期
+
+```typescript
+interceptor.hook((request) => {
+  // 请求前: 改写请求参数
+  request.url = request.url.replace('/api/v1', '/api/v2');
+  request.headers.set('x-trace-id', crypto.randomUUID());
+
+  // 请求后: XHR + Fetch 统一响应回调
+  request.response = async (response) => {
+    console.log('status:', response.status);
+  };
+
+  return request;
+});
+```
+
+### 按请求类型精细控制
+
+```typescript
+// 只注入 Fetch 拦截
+interceptor.inject('fetch');
+
+// 只拦截 Fetch 请求
+interceptor.hook((request) => {
+  request.headers.set('x-from', 'fetch-only');
+  return request;
+}, 'fetch');
+
+// 只移除 Fetch 拦截
+interceptor.uninject('fetch');
+```
+
+### 使用 `unhook` 移除钩子
+
+```typescript
+const authHook = (request) => {
+  request.headers.set('Authorization', 'Bearer token');
+  return request;
+};
+
+interceptor.hook(authHook);
+
+// 移除指定钩子
+interceptor.unhook(authHook);
+
+// 仅清空 xhr 的全部钩子
+interceptor.unhook(undefined, 'xhr');
+
+// 清空 xhr + fetch 的全部钩子
+interceptor.unhook();
+```
+
+### 废弃兼容字段 (1.x)
+
+`interceptor.xhrInterceptor` 和 `interceptor.fetchInterceptor` 在 1.x 中仍保留用于向后兼容,但已标记为废弃,并计划在 2.x 改为私有。
+
+建议使用公开 API:
+
+- `interceptor.hook(...)`
+- `interceptor.unhook(...)`
+- `interceptor.inject(...)`
+- `interceptor.uninject(...)`
 
 ## API
 
@@ -115,6 +187,32 @@ interceptor.hook((request) => {
   console.log('Fetch 请求:', request.url);
   return request;
 }, 'fetch');
+```
+
+### unhook(fn?, type?)
+
+移除单个钩子或清空钩子。
+
+**参数:**
+- `fn`: 可选。传入时移除该钩子; 不传则清空所有钩子。
+- `type`: 可选。指定 `'xhr'` 或 `'fetch'` 只清理对应类型; 不传则两者都处理。
+
+```typescript
+const loggerHook = (request) => {
+  console.log(request.url);
+  return request;
+};
+
+interceptor.hook(loggerHook);
+
+// 移除一个钩子
+interceptor.unhook(loggerHook);
+
+// 清空所有 fetch 钩子
+interceptor.unhook(undefined, 'fetch');
+
+// 清空全部钩子
+interceptor.unhook();
 ```
 
 ## 请求对象 (AjaxInterceptorRequest)
@@ -330,6 +428,16 @@ interceptor.hook((request) => {
 
 ## 开发
 
+### 构建产物
+
+- ESM: `dist/esm/index.js`
+- CJS: `dist/cjs/index.js`
+- IIFE(浏览器全局): `dist/iife/index.js`
+- 共享类型声明: `dist/types/*.d.ts`
+- UMD: 默认不产出(如需兼容老式加载器可后续追加)
+
+> 类型声明只生成一份到 `dist/types`,由 ESM/CJS 共同复用。
+
 ```bash
 # 安装依赖
 pnpm install
@@ -339,6 +447,12 @@ pnpm dev
 
 # 构建
 pnpm build
+
+# 仅构建 JS
+pnpm build:js
+
+# 仅构建类型(统一输出到 dist/types)
+pnpm build:types
 
 # 测试
 pnpm test

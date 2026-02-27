@@ -47,7 +47,10 @@ const config: RollupOptions = {
     }),
     typescript({
       tsconfig: './tsconfig.json',
-      exclude: !isDev ? ['src/demo/**/*', 'rollup.config.ts', 'test/**/*'] : [],
+      sourceMap: isDev,
+      exclude: !isDev
+        ? ['src/demo/**/*', 'rollup.config.ts', 'test/**/*']
+        : [],
     }),
     ...(terserPlugin ? [terserPlugin] : []),
     ...(servePlugin ? [servePlugin] : []),

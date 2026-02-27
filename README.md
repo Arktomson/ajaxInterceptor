@@ -2,13 +2,19 @@
 
 English | [中文](./README.zh-CN.md)
 
-A lightweight AJAX request interceptor that supports intercepting and modifying both XMLHttpRequest and Fetch requests.
+`ajax-hooker` is a browser-side AJAX interception library. It deeply hooks native `XMLHttpRequest` and `fetch`, then normalizes both into one hook lifecycle so interception logic can be written once and reused across request types.
+
+## Highlights
+
+- Deep AJAX interception: hooks core request stages of XHR and Fetch instead of only wrapping business-layer request helpers.
+- Unified request lifecycle: flattens XHR/Fetch differences into two main phases: before request (request mutation) and after response (response handling).
+- Stream-aware interception: supports chunk-level interception for streaming responses.
 
 ## Features
 
-- Works with both XMLHttpRequest and Fetch API
-- Intercepts and modifies request parameters (URL, Method, Headers, Body)
-- Captures response data
+- Works with both `XMLHttpRequest` and `fetch`
+- Intercepts and modifies request parameters (`url`, `method`, `headers`, `data`)
+- Captures response data through one unified callback model
 - Supports streaming response interception (SSE, NDJSON, streaming JSON, etc.)
 - Chain multiple hook functions
 - Singleton pattern ensures a single global instance
@@ -45,6 +51,72 @@ interceptor.hook((request) => {
   return request;
 });
 ```
+
+## API Updates (v1.1+)
+
+### Unified Before/After Request Lifecycle
+
+```typescript
+interceptor.hook((request) => {
+  // Before request: mutate request params
+  request.url = request.url.replace('/api/v1', '/api/v2');
+  request.headers.set('x-trace-id', crypto.randomUUID());
+
+  // After response: unified response callback for XHR + Fetch
+  request.response = async (response) => {
+    console.log('status:', response.status);
+  };
+
+  return request;
+});
+```
+
+### Fine-Grained Control by Request Type
+
+```typescript
+// Inject only Fetch interception
+interceptor.inject('fetch');
+
+// Hook only Fetch requests
+interceptor.hook((request) => {
+  request.headers.set('x-from', 'fetch-only');
+  return request;
+}, 'fetch');
+
+// Remove only Fetch interception
+interceptor.uninject('fetch');
+```
+
+### Remove Hooks with `unhook`
+
+```typescript
+const authHook = (request) => {
+  request.headers.set('Authorization', 'Bearer token');
+  return request;
+};
+
+interceptor.hook(authHook);
+
+// Remove a specific hook
+interceptor.unhook(authHook);
+
+// Clear all hooks for xhr only
+interceptor.unhook(undefined, 'xhr');
+
+// Clear all hooks for both xhr and fetch
+interceptor.unhook();
+```
+
+### Deprecated Compatibility Fields (1.x)
+
+`interceptor.xhrInterceptor` and `interceptor.fetchInterceptor` are still available in 1.x for backward compatibility, but they are deprecated and planned to become private in 2.x.
+
+Prefer the public APIs:
+
+- `interceptor.hook(...)`
+- `interceptor.unhook(...)`
+- `interceptor.inject(...)`
+- `interceptor.uninject(...)`
 
 ## API
 
@@ -115,6 +187,32 @@ interceptor.hook((request) => {
   console.log('Fetch:', request.url);
   return request;
 }, 'fetch');
+```
+
+### unhook(fn?, type?)
+
+Remove one hook or clear hooks.
+
+**Parameters:**
+- `fn`: Optional. If provided, remove this specific hook. If omitted, clear all hooks.
+- `type`: Optional. Specify `'xhr'` or `'fetch'` to remove hooks only for one type. If omitted, both are affected.
+
+```typescript
+const loggerHook = (request) => {
+  console.log(request.url);
+  return request;
+};
+
+interceptor.hook(loggerHook);
+
+// Remove one hook
+interceptor.unhook(loggerHook);
+
+// Clear all fetch hooks
+interceptor.unhook(undefined, 'fetch');
+
+// Clear all hooks
+interceptor.unhook();
 ```
 
 ## Request Object (AjaxInterceptorRequest)
@@ -330,6 +428,16 @@ interceptor.hook((request) => {
 
 ## Development
 
+### Build Outputs
+
+- ESM: `dist/esm/index.js`
+- CJS: `dist/cjs/index.js`
+- IIFE (browser global): `dist/iife/index.js`
+- Shared type declarations: `dist/types/*.d.ts`
+- UMD: not emitted by default (can be added later for legacy loader scenarios)
+
+> Type declarations are generated once into `dist/types` and shared by both ESM and CJS consumers.
+
 ```bash
 # Install dependencies
 pnpm install
@@ -339,6 +447,12 @@ pnpm dev
 
 # Build
 pnpm build
+
+# Build JS only
+pnpm build:js
+
+# Build types only (single shared declarations in dist/types)
+pnpm build:types
 
 # Test
 pnpm test

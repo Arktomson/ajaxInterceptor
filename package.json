@@ -3,6 +3,7 @@
   "version": "1.1.1",
   "description": "A plugin for intercepting and modifying AJAX requests",
   "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
   "type": "module",
   "types": "dist/types/index.d.ts",
   "exports": {
@@ -17,7 +18,9 @@
   ],
   "scripts": {
     "dev": "rollup -c -w --environment NODE_ENV:development --configPlugin @rollup/plugin-typescript",
-    "build": "rollup -c --environment NODE_ENV:production --configPlugin @rollup/plugin-typescript",
+    "build:js": "rollup -c --environment NODE_ENV:production --configPlugin @rollup/plugin-typescript",
+    "build:types": "tsc --target ESNext --module ESNext --moduleResolution Node --lib ESNext,DOM --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --declaration --emitDeclarationOnly --declarationDir dist/types --declarationMap false --sourceMap false --types node src/index.ts",
+    "build": "pnpm run build:js && pnpm run build:types",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

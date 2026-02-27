@@ -9,7 +9,15 @@ import { XhrInterceptor } from './xhr';
 import { FetchInterceptor } from './fetch';
 
 class AjaxInterceptor {
+  /**
+   * @deprecated Direct access to internal interceptor instances is kept only for 1.x compatibility.
+   * Use `hook` / `unhook` / `inject` / `uninject` instead. Planned to become private in 2.x.
+   */
   public xhrInterceptor: XhrInterceptor;
+  /**
+   * @deprecated Direct access to internal interceptor instances is kept only for 1.x compatibility.
+   * Use `hook` / `unhook` / `inject` / `uninject` instead. Planned to become private in 2.x.
+   */
   public fetchInterceptor: FetchInterceptor;
   static #instance: AjaxInterceptor;
   static #token = Symbol('AjaxInterceptor');
@@ -77,6 +85,31 @@ class AjaxInterceptor {
       default:
         this.xhrInterceptor.hooks.push(fn);
         this.fetchInterceptor.hooks.push(fn);
+        break;
+    }
+  }
+  public unhook(fn?: HookFunction, type?: AjaxType) {
+    const removeFrom = (hooks: HookFunction[]) => {
+      if (!fn) {
+        hooks.length = 0;
+        return;
+      }
+      const index = hooks.indexOf(fn);
+      if (index !== -1) {
+        hooks.splice(index, 1);
+      }
+    };
+
+    switch (type) {
+      case AJAX_TYPE.XHR:
+        removeFrom(this.xhrInterceptor.hooks);
+        break;
+      case AJAX_TYPE.FETCH:
+        removeFrom(this.fetchInterceptor.hooks);
+        break;
+      default:
+        removeFrom(this.xhrInterceptor.hooks);
+        removeFrom(this.fetchInterceptor.hooks);
         break;
     }
   }
