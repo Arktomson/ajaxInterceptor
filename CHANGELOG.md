@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.1 (2026-02-27)
+
+### 🇺🇸 English
+
+- feat: Refine build/docs and bridge global export ([23bff35](https://github.com/Arktomson/ajaxInterceptor/commit/23bff35)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- feat: 优化构建产物与文档并桥接全局导出 ([23bff35](https://github.com/Arktomson/ajaxInterceptor/commit/23bff35)) [@arktomson](https://github.com/arktomson)
+
 ## 1.2.0 (2026-02-27)
 
 ### 🇺🇸 English
