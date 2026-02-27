@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.0 (2026-02-27)
+
+### 🇺🇸 English
+
+- feat: Refine build outputs and deprecate internal fields ([08b172c](https://github.com/Arktomson/ajaxInterceptor/commit/08b172c)) [@胜簪](https://github.com/胜簪)
+
+### 🇨🇳 简体中文
+
+- feat: 优化构建产物并标记内部字段废弃 ([08b172c](https://github.com/Arktomson/ajaxInterceptor/commit/08b172c)) [@胜簪](https://github.com/胜簪)
+
 ## 1.1.1 (2026-02-26)
 
 ### 🇺🇸 English
