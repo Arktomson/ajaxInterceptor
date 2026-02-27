@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ajax-hooker: XHR + Fetch Demo</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 24px;
+        line-height: 1.5;
+      }
+      button {
+        margin-right: 8px;
+        margin-bottom: 12px;
+      }
+      pre {
+        background: #111;
+        color: #d6f5d6;
+        padding: 12px;
+        border-radius: 8px;
+        min-height: 220px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ajax-hooker: Unified XHR + Fetch Hooks</h1>
+    <p>Click buttons and inspect how one hook model handles both request types.</p>
+
+    <button id="run-fetch">Run Fetch</button>
+    <button id="run-xhr">Run XHR</button>
+    <button id="clear-log">Clear Log</button>
+    <pre id="log"></pre>
+
+    <script src="../../dist/iife/index.js"></script>
+    <script>
+      const interceptor = window.AjaxHooker.getInstance();
+      const logEl = document.getElementById("log");
+
+      function log(...args) {
+        logEl.textContent += `${args.join(" ")}\n`;
+      }
+
+      interceptor.inject();
+
+      interceptor.hook((request) => {
+        request.headers.set("x-demo-source", request.type);
+        request.response = async (response) => {
+          log(`[${request.type}]`, request.method, request.url, "->", response.status);
+        };
+        return request;
+      });
+
+      document.getElementById("run-fetch").addEventListener("click", async () => {
+        const res = await fetch("https://httpbin.org/anything?from=fetch");
+        const json = await res.json();
+        log("fetch result:", json.url);
+      });
+
+      document.getElementById("run-xhr").addEventListener("click", () => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", "https://httpbin.org/anything?from=xhr");
+        xhr.onload = () => {
+          const data = JSON.parse(xhr.responseText);
+          log("xhr result:", data.url);
+        };
+        xhr.send();
+      });
+
+      document.getElementById("clear-log").addEventListener("click", () => {
+        logEl.textContent = "";
+      });
+    </script>
+  </body>
+</html>

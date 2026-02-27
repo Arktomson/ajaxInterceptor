@@ -1,3 +1,6 @@
+import { http, HttpResponse } from 'msw';
+import { server } from './msw/server';
+
 describe('Fetch - 统一添加认证 Token', () => {
   it('Fetch 请求应该自动添加 Authorization token', async () => {
     const token = 'test-token-123';
@@ -261,5 +264,91 @@ describe('Fetch - XHR 和 Fetch 混合使用', () => {
       url: expect.stringContaining('/api/products'),
       method: 'GET',
     });
+  });
+});
+
+describe('Fetch - 流式响应拦截', () => {
+  const readStreamText = async (body: ReadableStream<Uint8Array> | null) => {
+    if (!body) return '';
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value, { stream: true });
+    }
+    output += decoder.decode();
+    return output;
+  };
+
+  it('应该能逐块拦截并改写流式响应', async () => {
+    server.use(
+      http.get('/api/stream', () => {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('chunk-one\n'));
+            controller.enqueue(encoder.encode('chunk-two\n'));
+            controller.close();
+          },
+        });
+        return new HttpResponse(body, {
+          headers: { 'content-type': 'application/x-ndjson' },
+        });
+      }),
+    );
+
+    let responseStatus = 0;
+    const chunkTexts: string[] = [];
+
+    interceptor.hook((request) => {
+      request.response = async (response) => {
+        responseStatus = response.status;
+      };
+      request.onStreamChunk = async (chunk) => {
+        chunkTexts.push(chunk.text);
+        return chunk.text.replace('chunk', 'modified');
+      };
+      return request;
+    }, 'fetch');
+
+    const response = await fetch('/api/stream');
+    const text = await readStreamText(response.body);
+
+    expect(responseStatus).toBe(200);
+    expect(chunkTexts.length).toBeGreaterThan(0);
+    expect(text).toContain('modified-one');
+    expect(text).toContain('modified-two');
+  });
+
+  it('onStreamChunk 抛错时应回退为原始 chunk', async () => {
+    server.use(
+      http.get('/api/stream-error', () => {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('raw-stream-data'));
+            controller.close();
+          },
+        });
+        return new HttpResponse(body, {
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }),
+    );
+
+    interceptor.hook((request) => {
+      request.onStreamChunk = async () => {
+        throw new Error('stream hook failed');
+      };
+      return request;
+    }, 'fetch');
+
+    const response = await fetch('/api/stream-error');
+    const text = await readStreamText(response.body);
+
+    expect(text).toContain('raw-stream-data');
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "ajax-hooker",
   "version": "1.2.0",
-  "description": "A plugin for intercepting and modifying AJAX requests",
+  "description": "Browser AJAX interceptor for XMLHttpRequest and fetch with unified hooks, request/response mutation, and streaming response support.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "type": "module",
@@ -10,12 +10,17 @@
     ".": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
-    }
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
+  "homepage": "https://github.com/Arktomson/ajaxInterceptor#readme",
+  "unpkg": "dist/iife/index.js",
+  "jsdelivr": "dist/iife/index.js",
   "scripts": {
     "dev": "rollup -c -w --environment NODE_ENV:development --configPlugin @rollup/plugin-typescript",
     "build:js": "rollup -c --environment NODE_ENV:production --configPlugin @rollup/plugin-typescript",
@@ -35,7 +40,18 @@
   "license": "MIT",
   "keywords": [
     "ajax",
-    "interceptor"
+    "interceptor",
+    "xmlhttprequest",
+    "xhr",
+    "fetch",
+    "request-interceptor",
+    "response-interceptor",
+    "network-interceptor",
+    "browser",
+    "typescript",
+    "streaming",
+    "sse",
+    "ndjson"
   ],
   "repository": {
     "type": "git",
@@ -59,6 +75,7 @@
     "rollup": "^4.52.2",
     "rollup-plugin-clear": "^2.0.7",
     "rollup-plugin-define": "^1.0.1",
+    "rollup-plugin-node-externals": "^8.1.2",
     "rollup-plugin-serve": "^3.0.0",
     "simple-git-hooks": "^2.13.1",
     "type-fest": "^5.4.4",

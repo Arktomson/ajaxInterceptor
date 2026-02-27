@@ -2,13 +2,34 @@
 
 [English](./README.md) | 中文
 
-`ajax-hooker` 是一个浏览器端 AJAX 拦截库。它会对原生 `XMLHttpRequest` 和 `fetch` 做深度劫持,并把两者抹平为统一的 Hook 生命周期,让拦截逻辑写一次即可复用。
+[![npm version](https://img.shields.io/npm/v/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
+[![npm downloads](https://img.shields.io/npm/dm/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
+[![CI](https://img.shields.io/github/actions/workflow/status/Arktomson/ajaxInterceptor/ci.yml?branch=master&label=ci)](https://github.com/Arktomson/ajaxInterceptor/actions/workflows/ci.yml)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/ajax-hooker)](https://bundlephobia.com/package/ajax-hooker)
+
+`ajax-hooker` 是一个浏览器端 AJAX 拦截库(XMLHttpRequest 拦截 + Fetch 拦截)。它会对原生 `XMLHttpRequest` 和 `fetch` 做深度劫持,并把两者抹平为统一的 Hook 生命周期,让拦截逻辑写一次即可复用。
 
 ## 项目亮点
 
 - 深度 AJAX 劫持: 直接拦截 XHR 与 Fetch 的关键阶段,而不是只包裹业务层请求函数。
 - 统一请求生命周期: 抹平 XHR/Fetch 差异,聚合为两个核心阶段: 请求前(请求参数改写)与请求后(响应处理)。
 - 流式能力完整: 支持对流式响应进行逐块拦截和改写。
+
+## 方案对比
+
+| 方案 | 原生 XHR + Fetch 覆盖 | 统一 Hook 生命周期 | 流式 Chunk 拦截 | 适用场景 |
+| --- | --- | --- | --- | --- |
+| `ajax-hooker` | 支持 | 支持 | 支持 | 浏览器侧请求治理和跨栈拦截 |
+| Axios interceptors | 不支持(仅 Axios) | 部分支持(仅 Axios 链路) | 不支持 | Axios 主导项目 |
+| 手写 monkey patch | 取决于实现 | 取决于实现 | 取决于实现 | 一次性快速实验 |
+| Service Worker 拦截 | 仅 Fetch | 不支持 | 有限/间接支持 | 离线缓存网关场景 |
+
+## 典型使用场景
+
+- 浏览器扩展中的请求治理(请求头改写、鉴权注入、接口切换)
+- API 调试与观测(在同一模型下采集请求/响应数据)
+- 混合 XHR + Fetch 代码库的统一拦截层
+- 流式响应处理(SSE/NDJSON/JSONL 的 chunk 级改写)
 
 ## 特性
 
@@ -25,6 +46,13 @@
 ```bash
 npm install ajax-hooker
 ```
+
+## 示例
+
+- [示例索引](./examples/README.md)
+- [原生 XHR + Fetch 示例](./examples/vanilla-xhr-fetch/index.html)
+- [流式 NDJSON 示例](./examples/streaming-ndjson/index.html)
+- [Chrome Extension (MV3) 示例](./examples/chrome-extension/README.md)
 
 ## 快速开始
 
@@ -107,9 +135,9 @@ interceptor.unhook(undefined, 'xhr');
 interceptor.unhook();
 ```
 
-### 废弃兼容字段 (1.x)
+### 兼容字段 (1.x)
 
-`interceptor.xhrInterceptor` 和 `interceptor.fetchInterceptor` 在 1.x 中仍保留用于向后兼容,但已标记为废弃,并计划在 2.x 改为私有。
+`interceptor.xhrInterceptor` 和 `interceptor.fetchInterceptor` 在 1.x 中仍保留用于向后兼容,并计划在 2.x 改为私有。
 
 建议使用公开 API:
 
@@ -437,6 +465,7 @@ interceptor.hook((request) => {
 - UMD: 默认不产出(如需兼容老式加载器可后续追加)
 
 > 类型声明只生成一份到 `dist/types`,由 ESM/CJS 共同复用。
+> IIFE 全局变量: `window.AjaxHooker`。
 
 ```bash
 # 安装依赖

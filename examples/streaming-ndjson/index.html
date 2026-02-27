@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ajax-hooker: Streaming NDJSON Demo</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 24px;
+      }
+      pre {
+        background: #111;
+        color: #d6f5d6;
+        padding: 12px;
+        border-radius: 8px;
+        min-height: 220px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Streaming Interception (NDJSON/SSE style)</h1>
+    <p>This demo transforms each incoming stream chunk before app code consumes it.</p>
+    <button id="run-stream">Run Stream Request</button>
+    <pre id="log"></pre>
+
+    <script src="../../dist/iife/index.js"></script>
+    <script>
+      const interceptor = window.AjaxHooker.getInstance();
+      const logEl = document.getElementById("log");
+
+      function log(...args) {
+        logEl.textContent += `${args.join(" ")}\n`;
+      }
+
+      interceptor.inject("fetch");
+      interceptor.unhook(undefined, "fetch");
+
+      interceptor.hook((request) => {
+        request.response = async (response) => {
+          log("stream started:", response.status, response.finalUrl);
+        };
+        request.onStreamChunk = async (chunk) => {
+          log("chunk", chunk.index, "len=", chunk.text.length);
+          return chunk.text.toUpperCase();
+        };
+        return request;
+      }, "fetch");
+
+      document.getElementById("run-stream").addEventListener("click", async () => {
+        log("sending request...");
+        const response = await fetch("https://httpbin.org/stream/3");
+        const text = await response.text();
+        log("--- transformed stream body ---");
+        log(text);
+      });
+    </script>
+  </body>
+</html>

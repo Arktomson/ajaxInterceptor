@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ajax-hooker-demo",
+  "version": "0.1.0",
+  "description": "MV3 demo for ajax-hooker request interception",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["vendor/ajax-hooker.iife.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

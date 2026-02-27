@@ -4,6 +4,7 @@ import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import serve from 'rollup-plugin-serve';
+import nodeExternals from 'rollup-plugin-node-externals';
 import { RollupOptions } from 'rollup';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -16,11 +17,14 @@ const terserPlugin = isProd
   ? terser({
       format: {
         comments: false,
+        beautify: true,
       },
       compress: {
+        defaults: false,
         drop_debugger: true,
         pure_funcs: ['console.log'],
       },
+      mangle: false,
     })
   : undefined;
 
@@ -33,28 +37,44 @@ const servePlugin = isDev
       port: 3010,
     })
   : undefined;
-const config: RollupOptions = {
+
+type CreatePluginsOptions = {
+  clearDist?: boolean;
+  externalizeDeps?: boolean;
+};
+
+const createPlugins = ({
+  clearDist = false,
+  externalizeDeps = false,
+}: CreatePluginsOptions = {}) => [
+  ...(clearDist
+    ? [
+        clear({
+          targets: ['dist'],
+        }),
+      ]
+    : []),
+  ...(externalizeDeps ? [nodeExternals()] : []),
+  nodeResolve(),
+  define({
+    replacements: {
+      __isDev__: JSON.stringify(isDev),
+    },
+  }),
+  typescript({
+    tsconfig: './tsconfig.json',
+    sourceMap: isDev,
+    exclude: !isDev
+      ? ['src/demo/**/*', 'rollup.config.ts', 'test/**/*']
+      : [],
+  }),
+  ...(terserPlugin ? [terserPlugin] : []),
+  ...(servePlugin ? [servePlugin] : []),
+];
+
+const devConfig: RollupOptions = {
   input: inputFile,
-  plugins: [
-    clear({
-      targets: ['dist'],
-    }),
-    nodeResolve(),
-    define({
-      replacements: {
-        __isDev__: JSON.stringify(isDev),
-      },
-    }),
-    typescript({
-      tsconfig: './tsconfig.json',
-      sourceMap: isDev,
-      exclude: !isDev
-        ? ['src/demo/**/*', 'rollup.config.ts', 'test/**/*']
-        : [],
-    }),
-    ...(terserPlugin ? [terserPlugin] : []),
-    ...(servePlugin ? [servePlugin] : []),
-  ],
+  plugins: createPlugins({ clearDist: true }),
   output: [
     {
       format: 'esm',
@@ -74,4 +94,39 @@ const config: RollupOptions = {
     },
   ],
 };
+
+const libraryConfig: RollupOptions = {
+  input: 'src/index.ts',
+  plugins: createPlugins({ clearDist: true, externalizeDeps: true }),
+  output: [
+    {
+      format: 'esm',
+      file: 'dist/esm/index.js',
+      sourcemap: false,
+    },
+    {
+      format: 'cjs',
+      file: 'dist/cjs/index.js',
+      sourcemap: false,
+    },
+  ],
+};
+
+const iifeConfig: RollupOptions = {
+  input: 'src/index.ts',
+  plugins: createPlugins({ clearDist: false }),
+  output: {
+    format: 'iife',
+    file: 'dist/iife/index.js',
+    name: 'AjaxHooker',
+    exports: 'named',
+    footer: 'AjaxHooker = Object.assign(AjaxHooker.default || AjaxHooker, AjaxHooker);',
+    sourcemap: false,
+  },
+};
+
+const config: RollupOptions | RollupOptions[] = isDev
+  ? devConfig
+  : [libraryConfig, iifeConfig];
+
 export default config;

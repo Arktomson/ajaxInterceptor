@@ -16,7 +16,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.spec.ts',
+        'src/demo/**/*',
+        'src/sse.ts',
+        'src/type.ts',
+      ],
     },
 
     // 全局测试设置

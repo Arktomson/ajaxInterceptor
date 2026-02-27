@@ -10,13 +10,17 @@ import { FetchInterceptor } from './fetch';
 
 class AjaxInterceptor {
   /**
-   * @deprecated Direct access to internal interceptor instances is kept only for 1.x compatibility.
-   * Use `hook` / `unhook` / `inject` / `uninject` instead. Planned to become private in 2.x.
+   * 1.x compatibility field.
+   * Direct access to internal instances is still available in 1.x,
+   * and is planned to become private in 2.x.
+   * Prefer `hook` / `unhook` / `inject` / `uninject`.
    */
   public xhrInterceptor: XhrInterceptor;
   /**
-   * @deprecated Direct access to internal interceptor instances is kept only for 1.x compatibility.
-   * Use `hook` / `unhook` / `inject` / `uninject` instead. Planned to become private in 2.x.
+   * 1.x compatibility field.
+   * Direct access to internal instances is still available in 1.x,
+   * and is planned to become private in 2.x.
+   * Prefer `hook` / `unhook` / `inject` / `uninject`.
    */
   public fetchInterceptor: FetchInterceptor;
   static #instance: AjaxInterceptor;

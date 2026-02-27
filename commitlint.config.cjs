@@ -7,7 +7,19 @@ module.exports = {
     {
       rules: {
         'bilingual-commit': (parsed) => {
-          const enforceTypes = ['feat', 'fix', 'refactor', 'perf'];
+          const enforceTypes = [
+            'feat',
+            'fix',
+            'refactor',
+            'perf',
+            'chore',
+            'docs',
+            'style',
+            'test',
+            'build',
+            'ci',
+            'revert',
+          ];
           const { type, subject } = parsed;
 
           if (!type || !enforceTypes.includes(type)) {

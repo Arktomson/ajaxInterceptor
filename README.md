@@ -2,13 +2,34 @@
 
 English | [中文](./README.zh-CN.md)
 
-`ajax-hooker` is a browser-side AJAX interception library. It deeply hooks native `XMLHttpRequest` and `fetch`, then normalizes both into one hook lifecycle so interception logic can be written once and reused across request types.
+[![npm version](https://img.shields.io/npm/v/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
+[![npm downloads](https://img.shields.io/npm/dm/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
+[![CI](https://img.shields.io/github/actions/workflow/status/Arktomson/ajaxInterceptor/ci.yml?branch=master&label=ci)](https://github.com/Arktomson/ajaxInterceptor/actions/workflows/ci.yml)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/ajax-hooker)](https://bundlephobia.com/package/ajax-hooker)
+
+`ajax-hooker` is a browser-side AJAX interception library (XMLHttpRequest interceptor + Fetch interceptor). It deeply hooks native `XMLHttpRequest` and `fetch`, then normalizes both into one hook lifecycle so interception logic can be written once and reused across request types.
 
 ## Highlights
 
 - Deep AJAX interception: hooks core request stages of XHR and Fetch instead of only wrapping business-layer request helpers.
 - Unified request lifecycle: flattens XHR/Fetch differences into two main phases: before request (request mutation) and after response (response handling).
 - Stream-aware interception: supports chunk-level interception for streaming responses.
+
+## Comparison
+
+| Solution | Native XHR + Fetch Coverage | Unified Hook Lifecycle | Streaming Chunk Interception | Best For |
+| --- | --- | --- | --- | --- |
+| `ajax-hooker` | Yes | Yes | Yes | Browser-side request governance and cross-stack interception |
+| Axios interceptors | No (Axios only) | Partial (Axios chain only) | No | Axios-centric projects |
+| Handwritten monkey patch | Depends on implementation | Depends on implementation | Depends on implementation | One-off quick experiments |
+| Service Worker interception | Fetch only | No | Limited/indirect | Offline/caching gateway scenarios |
+
+## Typical Use Cases
+
+- Browser extension request governance (header rewrite, auth injection, endpoint switching)
+- API observability and debugging (capture normalized request/response in one place)
+- Runtime compatibility layer for mixed XHR + Fetch codebases
+- Streaming response transformation (SSE/NDJSON/JSONL chunk processing)
 
 ## Features
 
@@ -25,6 +46,13 @@ English | [中文](./README.zh-CN.md)
 ```bash
 npm install ajax-hooker
 ```
+
+## Examples
+
+- [Example Index](./examples/README.md)
+- [Vanilla XHR + Fetch Demo](./examples/vanilla-xhr-fetch/index.html)
+- [Streaming NDJSON Demo](./examples/streaming-ndjson/index.html)
+- [Chrome Extension (MV3) Demo](./examples/chrome-extension/README.md)
 
 ## Quick Start
 
@@ -107,9 +135,9 @@ interceptor.unhook(undefined, 'xhr');
 interceptor.unhook();
 ```
 
-### Deprecated Compatibility Fields (1.x)
+### Compatibility Fields (1.x)
 
-`interceptor.xhrInterceptor` and `interceptor.fetchInterceptor` are still available in 1.x for backward compatibility, but they are deprecated and planned to become private in 2.x.
+`interceptor.xhrInterceptor` and `interceptor.fetchInterceptor` are still available in 1.x for backward compatibility. They are planned to become private in 2.x.
 
 Prefer the public APIs:
 
@@ -437,6 +465,7 @@ interceptor.hook((request) => {
 - UMD: not emitted by default (can be added later for legacy loader scenarios)
 
 > Type declarations are generated once into `dist/types` and shared by both ESM and CJS consumers.
+> IIFE global variable: `window.AjaxHooker`.
 
 ```bash
 # Install dependencies
