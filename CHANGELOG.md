@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.2 (2026-02-28)
+
+### 🇺🇸 English
+
+- fix: Fix XHR response field handling and listener removal semantics ([5d9f261](https://github.com/Arktomson/ajaxInterceptor/commit/5d9f261)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- fix: 修复XHR响应字段与事件移除语义 ([5d9f261](https://github.com/Arktomson/ajaxInterceptor/commit/5d9f261)) [@arktomson](https://github.com/arktomson)
+
 ## 1.2.1 (2026-02-27)
 
 ### 🇺🇸 English
