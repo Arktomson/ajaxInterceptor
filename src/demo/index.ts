@@ -16,13 +16,13 @@ ajaxInterceptor.hook((request) => {
     request.headers.append('csz','2')
   }
   request.response = async (response: AjaxResponse) => {
-    if(response.status === 401) {
-      response.status = 200;
-      response.statusText = 'OK';
-      response.response = {
-        name: '已缓存'
-      }
-    }
+    // if(response.status === 401) {
+    //   response.status = 200;
+    //   response.statusText = 'OK';
+    //   response.response = {
+    //     name: '已缓存'
+    //   }
+    // }
     console.log(response, 'response.json')
   }
   // if (request.url === '/api/outer/ats-apply/website/jobs/v2') {

@@ -77,9 +77,14 @@ export class XhrInterceptor {
         const needReopen =
           oldRequest.method !== newRequest.method ||
           oldRequest.url !== newRequest.url;
+        const headersChanged = !self.headersEqual(
+          oldRequest.headers,
+          newRequest.headers,
+        );
+        const shouldReopen = needReopen || headersChanged;
 
         // 1. reopen
-        if (needReopen) {
+        if (shouldReopen) {
           self.nativeXhrPrototype.open.apply(target, [
             hooker.req.method,
             hooker.req.url,
@@ -96,10 +101,7 @@ export class XhrInterceptor {
         }
 
         // 3. headers
-        if (
-          needReopen ||
-          !self.headersEqual(oldRequest.headers, newRequest.headers)
-        ) {
+        if (shouldReopen) {
           hooker.req.headers.forEach((val, key) => {
             target.setRequestHeader(key, val);
           });
@@ -121,15 +123,52 @@ export class XhrInterceptor {
       target: XMLHttpRequest,
       receiver: any,
     ) {
-      return function (type: string, listener: EventListener, ...args: any[]) {
+      return function (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        ...args: any[]
+      ) {
         const isResponseEvent = self.xhrResponseEvents.includes(type);
+        const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
+        const capture = self.getCaptureOption(args[0]);
         const newListener = async function (...args) {
           if (isResponseEvent && target.readyState === 4) {
             await self.responseProcessor(target);
           }
-          Reflect.apply(listener, receiver, args);
+          if (typeof listener === 'function') {
+            Reflect.apply(listener, receiver, args);
+            return;
+          }
+          const [event] = args;
+          listener.handleEvent?.(event as Event);
         };
+
+        hooker.saveWrappedEventListener(type, capture, listener, newListener);
         target.addEventListener(type, newListener, ...args);
+      };
+    },
+    removeEventListener: function (self: XhrInterceptor, target: XMLHttpRequest) {
+      return function (
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: boolean | EventListenerOptions,
+      ) {
+        if (!listener) {
+          return self.nativeXhrPrototype.removeEventListener.apply(target, [
+            type,
+            listener,
+            options,
+          ]);
+        }
+        const hooker: XhrCycleScheduler = target[CYCLE_SCHEDULER];
+        const capture = self.getCaptureOption(options);
+        const wrappedListener =
+          hooker.getWrappedEventListener(type, capture, listener) || listener;
+        self.nativeXhrPrototype.removeEventListener.apply(target, [
+          type,
+          wrappedListener,
+          options,
+        ]);
       };
     },
   };
@@ -193,10 +232,24 @@ export class XhrInterceptor {
     }
     hooker.xhrAlreadyReturned = true;
 
+    let responseText: string | undefined;
+    if (target.responseType === '' || target.responseType === 'text') {
+      try {
+        responseText = target.responseText;
+      } catch (_error) {}
+    }
+
+    let responseXML: Document | null | undefined;
+    try {
+      responseXML = target.responseXML;
+    } catch (_error) {}
+
     hooker.resp = {
       status: target.status,
       statusText: target.statusText,
       response: target.response,
+      responseText,
+      responseXML,
       headers: new Headers(this.parseHeaders(target.getAllResponseHeaders())),
       finalUrl: target.responseURL || '',
     };
@@ -214,6 +267,10 @@ export class XhrInterceptor {
       return arr.sort().toString();
     };
     return toSortedString(a) === toSortedString(b);
+  }
+  private getCaptureOption(options?: boolean | AddEventListenerOptions | EventListenerOptions) {
+    if (typeof options === 'boolean') return options;
+    return !!options?.capture;
   }
   private getAttrHandler(target: XMLHttpRequest, attr: string, receiver?: any) {
     if (this.xhrInstanceAttr.includes(attr)) {
@@ -269,12 +326,47 @@ class XhrCycleScheduler extends CycleScheduler {
   public xhrAlreadyReturned = false;
   public xhrOpenRestArgs: (string | boolean | URL)[] = [];
   public xhrSetRequestHeadersAfterOpen: Headers = new Headers();
+  private xhrWrappedEventListeners = new Map<
+    string,
+    {
+      captureTrue: WeakMap<EventListenerOrEventListenerObject, EventListener>;
+      captureFalse: WeakMap<EventListenerOrEventListenerObject, EventListener>;
+    }
+  >();
+  private getListenerBucket(type: string) {
+    if (!this.xhrWrappedEventListeners.has(type)) {
+      this.xhrWrappedEventListeners.set(type, {
+        captureTrue: new WeakMap(),
+        captureFalse: new WeakMap(),
+      });
+    }
+    return this.xhrWrappedEventListeners.get(type)!;
+  }
+  public saveWrappedEventListener(
+    type: string,
+    capture: boolean,
+    original: EventListenerOrEventListenerObject,
+    wrapped: EventListener,
+  ) {
+    const bucket = this.getListenerBucket(type);
+    (capture ? bucket.captureTrue : bucket.captureFalse).set(original, wrapped);
+  }
+  public getWrappedEventListener(
+    type: string,
+    capture: boolean,
+    original: EventListenerOrEventListenerObject,
+  ) {
+    const bucket = this.xhrWrappedEventListeners.get(type);
+    if (!bucket) return null;
+    return (capture ? bucket.captureTrue : bucket.captureFalse).get(original) ?? null;
+  }
   public xhrReset() {
     this.req = {} as AjaxInterceptorRequest;
     this.resp = {} as AjaxResponse;
     this.xhrOpenRestArgs = [];
     this.xhrSetRequestHeadersAfterOpen = new Headers();
     this.xhrAlreadyReturned = false;
+    this.xhrWrappedEventListeners.clear();
   }
   constructor({
     req = {} as AjaxInterceptorRequest,

@@ -484,6 +484,59 @@ describe('业务场景 - addEventListener 拦截', () => {
     const parsed = JSON.parse(eventResponse);
     expect(parsed.modified).toBe('yes');
   });
+
+  it('EventListenerObject 监听器应被正确调用', async () => {
+    const handleEvent = vi.fn();
+    const listenerObj = { handleEvent };
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/data');
+    xhr.addEventListener('load', listenerObj);
+
+    await new Promise<void>((resolve) => {
+      xhr.onloadend = () => resolve();
+      xhr.onerror = () => resolve();
+      xhr.send();
+    });
+
+    expect(handleEvent).toHaveBeenCalledTimes(1);
+    const event = handleEvent.mock.calls[0]?.[0];
+    expect(event?.type).toBe('load');
+  });
+
+  it('removeEventListener 应能移除 addEventListener 注册的函数监听器', async () => {
+    const onLoad = vi.fn();
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/data');
+    xhr.addEventListener('load', onLoad, true);
+    xhr.removeEventListener('load', onLoad, true);
+
+    await new Promise<void>((resolve) => {
+      xhr.onloadend = () => resolve();
+      xhr.onerror = () => resolve();
+      xhr.send();
+    });
+
+    expect(onLoad).not.toHaveBeenCalled();
+  });
+
+  it('removeEventListener 在未注册监听器时应走原生 fallback 且不抛错', async () => {
+    const neverAdded = vi.fn();
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/data');
+    // 这个监听器从未 add 过，用于覆盖映射缺失分支
+    xhr.removeEventListener('load', neverAdded);
+
+    await new Promise<void>((resolve) => {
+      xhr.onloadend = () => resolve();
+      xhr.onerror = () => resolve();
+      xhr.send();
+    });
+
+    expect(neverAdded).not.toHaveBeenCalled();
+  });
 });
 
 describe('业务场景 - uninject 恢复原始 XHR', () => {
@@ -685,5 +738,35 @@ describe('业务场景 - onload 和 readystatechange 同时绑定', () => {
     // 两种方式读到的响应应该一致
     expect(JSON.parse(onloadResponse).counted).toBe(true);
     expect(JSON.parse(readystateResponse).counted).toBe(true);
+  });
+});
+
+describe('业务场景 - parseHeaders 分支覆盖', () => {
+  it('应支持 Headers 输入并合并同名 header', () => {
+    const headers = new Headers();
+    headers.append('X-Trace', 'a');
+    headers.append('x-trace', 'b');
+    headers.append('Content-Type', 'application/json');
+
+    const parsed = (interceptor.xhrInterceptor as any).parseHeaders(
+      headers,
+    ) as Record<string, string>;
+
+    expect(parsed['x-trace']).toBe('a, b');
+    expect(parsed['content-type']).toBe('application/json');
+  });
+
+  it('应支持 plain object 输入并忽略 null/undefined 值', () => {
+    const parsed = (interceptor.xhrInterceptor as any).parseHeaders({
+      'X-Trace': 'trace-id',
+      'x-number': 123 as any,
+      'X-Null': null as any,
+      'X-Undefined': undefined as any,
+    }) as Record<string, string>;
+
+    expect(parsed['x-trace']).toBe('trace-id');
+    expect(parsed['x-number']).toBe('123');
+    expect(parsed['x-null']).toBeUndefined();
+    expect(parsed['x-undefined']).toBeUndefined();
   });
 });
