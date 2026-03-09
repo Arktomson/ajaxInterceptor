@@ -206,6 +206,13 @@ export class FetchInterceptor {
     }
     return new Headers(headers);
   }
+  private isWasmRequest(url: string) {
+    try {
+      return new URL(url).pathname.endsWith('.wasm');
+    } catch (_error) {
+      return url.split('?')[0].endsWith('.wasm');
+    }
+  }
   private _generateProxyFetch() {
     const self = this;
 
@@ -215,6 +222,11 @@ export class FetchInterceptor {
     ) {
       const request = self.normalizeRequest(req);
       const winFetch = self.nativeFetch;
+
+      if (self.isWasmRequest(request.url)) {
+        return winFetch(req, options);
+      }
+
       const hooker = new FetchCycleScheduler();
 
       // 追踪每个属性的来源

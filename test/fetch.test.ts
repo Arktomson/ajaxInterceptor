@@ -352,3 +352,39 @@ describe('Fetch - 流式响应拦截', () => {
     expect(text).toContain('raw-stream-data');
   });
 });
+
+describe('Fetch - .wasm 响应绕过代理', () => {
+  it('应完全跳过 wasm 拦截并返回原生 Response 以兼容 compileStreaming', async () => {
+    server.use(
+      http.get('/assets/test.wasm', ({ request }) => {
+        expect(request.headers.get('x-wasm-token')).toBeNull();
+        return new HttpResponse(
+          new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
+          {
+            headers: { 'content-type': 'application/wasm' },
+          },
+        );
+      }),
+    );
+
+    let requestHookCalled = false;
+    let responseHookCalled = false;
+
+    interceptor.hook((request) => {
+      if (request.url.includes('/assets/test.wasm')) {
+        requestHookCalled = true;
+        request.headers.set('x-wasm-token', 'enabled');
+        request.response = async () => {
+          responseHookCalled = true;
+        };
+      }
+      return request;
+    }, 'fetch');
+
+    const module = await WebAssembly.compileStreaming(fetch('/assets/test.wasm'));
+
+    expect(module).toBeInstanceOf(WebAssembly.Module);
+    expect(requestHookCalled).toBe(false);
+    expect(responseHookCalled).toBe(false);
+  });
+});
