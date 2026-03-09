@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.3 (2026-03-09)
+
+### 🇺🇸 English
+
+- fix: Skip WASM request interception ([0da9dd8](https://github.com/Arktomson/ajaxInterceptor/commit/0da9dd8)) [@胜簪](https://github.com/胜簪)
+
+### 🇨🇳 简体中文
+
+- fix: 跳过WASM请求拦截 ([0da9dd8](https://github.com/Arktomson/ajaxInterceptor/commit/0da9dd8)) [@胜簪](https://github.com/胜簪)
+
 ## 1.2.2 (2026-02-28)
 
 ### 🇺🇸 English
