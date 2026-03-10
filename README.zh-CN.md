@@ -5,7 +5,6 @@
 [![npm version](https://img.shields.io/npm/v/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
 [![npm downloads](https://img.shields.io/npm/dm/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
 [![CI](https://img.shields.io/github/actions/workflow/status/Arktomson/ajaxInterceptor/ci.yml?branch=master&label=ci)](https://github.com/Arktomson/ajaxInterceptor/actions/workflows/ci.yml)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/ajax-hooker)](https://bundlephobia.com/package/ajax-hooker)
 
 `ajax-hooker` 是一个浏览器端 AJAX 拦截库(XMLHttpRequest 拦截 + Fetch 拦截)。它会对原生 `XMLHttpRequest` 和 `fetch` 做深度劫持,并把两者抹平为统一的 Hook 生命周期,让拦截逻辑写一次即可复用。
 

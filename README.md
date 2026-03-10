@@ -3,9 +3,8 @@
 English | [中文](./README.zh-CN.md)
 
 [![npm version](https://img.shields.io/npm/v/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
-[![npm downloads](https://img.shields.io/npm/dm/ajax-hooker.svg)](https://www.npmjs.com/package/ajax-hooker)
+[![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2Flast-day%2Fajax-hooker&query=%24.downloads&label=downloads&suffix=%2Fday&color=green)](https://www.npmjs.com/package/ajax-hooker)
 [![CI](https://img.shields.io/github/actions/workflow/status/Arktomson/ajaxInterceptor/ci.yml?branch=master&label=ci)](https://github.com/Arktomson/ajaxInterceptor/actions/workflows/ci.yml)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/ajax-hooker)](https://bundlephobia.com/package/ajax-hooker)
 
 `ajax-hooker` is a browser-side AJAX interception library (XMLHttpRequest interceptor + Fetch interceptor). It deeply hooks native `XMLHttpRequest` and `fetch`, then normalizes both into one hook lifecycle so interception logic can be written once and reused across request types.
 
