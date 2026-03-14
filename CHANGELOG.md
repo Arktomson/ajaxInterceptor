@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.4 (2026-03-14)
+
+### 🇺🇸 English
+
+- docs: Update npm daily downloads badge ([464e0d4](https://github.com/Arktomson/ajaxInterceptor/commit/464e0d4)) [@胜簪](https://github.com/胜簪)
+
+### 🇨🇳 简体中文
+
+- docs: 更新 npm 每日下载量徽章 ([464e0d4](https://github.com/Arktomson/ajaxInterceptor/commit/464e0d4)) [@胜簪](https://github.com/胜簪)
+
 ## 1.2.3 (2026-03-09)
 
 ### 🇺🇸 English
