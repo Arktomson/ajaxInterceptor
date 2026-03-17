@@ -1,6 +1,6 @@
 {
   "name": "ajax-hooker",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Browser AJAX interceptor for XMLHttpRequest and fetch with unified hooks, request/response mutation, and streaming response support.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",

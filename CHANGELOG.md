@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.5 (2026-03-17)
+
+### 🇺🇸 English
+
+- feat: Export constants and comment out request modification logic in the demo ([67c5828](https://github.com/Arktomson/ajaxInterceptor/commit/67c5828)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- feat: 常量导出 ([67c5828](https://github.com/Arktomson/ajaxInterceptor/commit/67c5828)) [@arktomson](https://github.com/arktomson)
+
 ## 1.2.4 (2026-03-14)
 
 ### 🇺🇸 English
