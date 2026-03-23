@@ -110,11 +110,19 @@ export class FetchInterceptor {
     newRequest: AjaxInterceptorRequest,
     sourceMap: SourceMap,
   ): string | URL | Request {
-    const urlChanged =
-      (typeof req === 'string' && newRequest.url !== req) ||
-      (req instanceof URL && newRequest.url !== req.href) ||
-      (req instanceof Request && newRequest.url !== req.url);
+    // const urlChanged =
+    //   (typeof req === 'string' && newRequest.url !== req) ||
+    //   (req instanceof URL && newRequest.url !== req.href) ||
+    //   (req instanceof Request && newRequest.url !== req.url);
 
+    const resolvedOriginalUrl =
+      typeof req === 'string'
+        ? resolveUrl(req)
+        : req instanceof URL
+          ? req.href
+          : req.url;
+
+    const urlChanged = newRequest.url !== resolvedOriginalUrl;
     if (typeof req === 'string') {
       return urlChanged ? newRequest.url : req;
     }
