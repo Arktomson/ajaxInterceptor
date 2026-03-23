@@ -1,5 +1,19 @@
 # ajax-hooker
 
+## 1.2.6 (2026-03-23)
+
+### 🇺🇸 English
+
+- fix: Skip modification if readyState is not OPENED ([913c2fc](https://github.com/Arktomson/ajaxInterceptor/commit/913c2fc)) [@arktomson](https://github.com/arktomson)
+- fix: Use resolveUrl to determine if url changed for string requests ([bce542f](https://github.com/Arktomson/ajaxInterceptor/commit/bce542f)) [@arktomson](https://github.com/arktomson)
+- fix: Update resolveUrl to use window.location.href ([87e90d6](https://github.com/Arktomson/ajaxInterceptor/commit/87e90d6)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- fix: 当 readyState 不是 OPENED 时跳过修改 ([913c2fc](https://github.com/Arktomson/ajaxInterceptor/commit/913c2fc)) [@arktomson](https://github.com/arktomson)
+- fix: 修复字符串请求下的 URL 变化检测 ([bce542f](https://github.com/Arktomson/ajaxInterceptor/commit/bce542f)) [@arktomson](https://github.com/arktomson)
+- fix: 修复 resolveUrl 基础路径 ([87e90d6](https://github.com/Arktomson/ajaxInterceptor/commit/87e90d6)) [@arktomson](https://github.com/arktomson)
+
 ## 1.2.5 (2026-03-17)
 
 ### 🇺🇸 English
