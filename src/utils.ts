@@ -8,7 +8,7 @@ export const getType = Object.prototype.toString.call.bind(
 );
 
 export const resolveUrl = (url: string | URL = '') => {
-  return new URL(url, window.location.origin).toString();
+  return new URL(url, window.location.href).toString();
 };
 
 export const safeStringify = (value: any) => {
