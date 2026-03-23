@@ -74,6 +74,10 @@ export class XhrInterceptor {
         }
         hooker.req = newRequest;
 
+        if (target.readyState !== XMLHttpRequest.OPENED) {
+          return;
+        }
+
         const needReopen =
           oldRequest.method !== newRequest.method ||
           oldRequest.url !== newRequest.url;
