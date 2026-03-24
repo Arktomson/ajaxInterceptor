@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.2.7 (2026-03-24)
+
+### 🇺🇸 English
+
+- fix: Simplify XHR constructor constant typing ([7efe920](https://github.com/Arktomson/ajaxInterceptor/commit/7efe920)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- fix: 简化XHR构造常量类型声明 ([7efe920](https://github.com/Arktomson/ajaxInterceptor/commit/7efe920)) [@arktomson](https://github.com/arktomson)
+
 ## 1.2.6 (2026-03-23)
 
 ### 🇺🇸 English
