@@ -15,6 +15,15 @@ export class XhrInterceptor {
   public hooks: HookFunction[] = [];
 
   // ---- private 属性 ----
+  private readonly xhrContructorKeys = {
+    UNSENT: this.nativeXhr.UNSENT,
+    OPENED: this.nativeXhr.OPENED,
+    HEADERS_RECEIVED: this.nativeXhr.HEADERS_RECEIVED,
+    LOADING: this.nativeXhr.LOADING,
+    DONE: this.nativeXhr.DONE,
+  } satisfies Readonly<
+    Record<'UNSENT' | 'OPENED' | 'HEADERS_RECEIVED' | 'LOADING' | 'DONE', number>
+  >;
   private xhrResponseEvents = ['readystatechange', 'load', 'loadend'];
   private xhrInstanceAttr = [
     'response',
@@ -74,7 +83,7 @@ export class XhrInterceptor {
         }
         hooker.req = newRequest;
 
-        if (target.readyState !== XMLHttpRequest.OPENED) {
+        if (target.readyState !== self.xhrContructorKeys.OPENED) {
           return;
         }
 
