@@ -83,7 +83,10 @@ export class XhrInterceptor {
         }
         hooker.req = newRequest;
 
-        if (target.readyState !== self.xhrContructorKeys.OPENED) {
+        if (
+          target.readyState !== self.xhrContructorKeys.OPENED &&
+          target.readyState !== self.xhrContructorKeys.UNSENT
+        ) {
           return;
         }
 
