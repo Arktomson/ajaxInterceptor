@@ -1,5 +1,17 @@
 # ajax-hooker
 
+## 1.3.0 (2026-03-28)
+
+### 🇺🇸 English
+
+- feat: Support response.mockError for fetch error simulation ([24ee3df](https://github.com/Arktomson/ajaxInterceptor/commit/24ee3df)) [@胜簪](https://github.com/胜簪)
+- fix: Handle UNSENT state before send ([7fa61a1](https://github.com/Arktomson/ajaxInterceptor/commit/7fa61a1)) [@胜簪](https://github.com/胜簪)
+
+### 🇨🇳 简体中文
+
+- feat: 支持 response.mockError 模拟报错 ([24ee3df](https://github.com/Arktomson/ajaxInterceptor/commit/24ee3df)) [@胜簪](https://github.com/胜簪)
+- fix: 处理 send 前 UNSENT 状态 ([7fa61a1](https://github.com/Arktomson/ajaxInterceptor/commit/7fa61a1)) [@胜簪](https://github.com/胜簪)
+
 ## 1.2.7 (2026-03-24)
 
 ### 🇺🇸 English
