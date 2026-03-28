@@ -295,6 +295,7 @@ The response object received by the response callback contains the following pro
 | `arrayBuffer` | `ArrayBuffer` | Read-only | Fetch only. Response ArrayBuffer |
 | `blob` | `Blob` | Read-only | Fetch only. Response Blob |
 | `formData` | `FormData` | Read-only | Fetch only. Response FormData |
+| `mockError` | `Error \| string` | **Writable** | Fetch only. Rejects the fetch promise after the real request has been sent |
 
 > **Note:** For Fetch responses, `json`, `text`, `arrayBuffer`, `blob`, and `formData` are automatically parsed by the interceptor and available as properties. No need to call `.json()` or similar methods. If parsing fails, the corresponding property is `null`.
 
@@ -319,6 +320,7 @@ interface AjaxResponse {
   arrayBuffer?: ArrayBuffer;
   blob?: Blob;
   formData?: FormData;
+  mockError?: Error | string;
 }
 ```
 
@@ -405,6 +407,21 @@ interceptor.hook((request) => {
   return request;
 }, 'xhr');
 ```
+
+### Simulate Fetch Network Errors
+
+```typescript
+interceptor.hook((request) => {
+  if (request.url.includes('/api/fail')) {
+    request.response = (response) => {
+      response.mockError = new TypeError('Failed to fetch');
+    };
+  }
+  return request;
+}, 'fetch');
+```
+
+> `mockError` is designed for **Fetch only**. For XHR failure simulation, prefer setting `request.timeout` and using a slow or hanging endpoint to trigger native timeout behavior.
 
 ### Intercept Streaming Responses
 

@@ -51,6 +51,19 @@ describe('Fetch - 修改响应数据', () => {
   });
 });
 
+describe('Fetch - 模拟原生 reject 报错', () => {
+  it('应该能在 hook 中主动 reject fetch 请求', async () => {
+    interceptor.hook((request) => {
+      request.response = async (response) => {
+        response.mockError = 'Failed to fetch';
+      };
+      return request;
+    });
+
+    await expect(fetch('/api/data')).rejects.toThrow('Failed to fetch');
+  });
+});
+
 describe('Fetch - 接口版本切换', () => {
   it('应该将 v1 接口自动切换到 v2', async () => {
     let modifiedUrl = '';

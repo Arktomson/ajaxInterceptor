@@ -214,6 +214,17 @@ export class FetchInterceptor {
     }
     return new Headers(headers);
   }
+  private resolveFetchError(error: Error | string): Error {
+    if (error instanceof Error) {
+      return error;
+    }
+    return new TypeError(error);
+  }
+  private throwIfMockError(mockError?: Error | string) {
+    if (mockError) {
+      throw this.resolveFetchError(mockError);
+    }
+  }
   private isWasmRequest(url: string) {
     try {
       return new URL(url).pathname.endsWith('.wasm');
@@ -311,6 +322,8 @@ export class FetchInterceptor {
           console.warn('[AjaxInterceptor] Error in fetch stream response callback:', error);
         }
 
+        self.throwIfMockError(hooker.resp.mockError);
+
         // 创建 TransformStream 拦截流数据
         let chunkIndex = 0;
         const { readable, writable } = new TransformStream({
@@ -392,6 +405,8 @@ export class FetchInterceptor {
         } catch (error) {
           console.warn('[AjaxInterceptor] Error in fetch response callback:', error);
         }
+
+        self.throwIfMockError(hooker.resp.mockError);
       }
 
       interceptedResponse[CYCLE_SCHEDULER] = hooker;

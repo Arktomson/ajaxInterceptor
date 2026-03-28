@@ -582,6 +582,24 @@ describe('业务场景 - Proxy set 非函数属性', () => {
 
     expect(xhr.timeout).toBe(5000);
   });
+
+  it('hook 应该能修改 timeout 属性', async () => {
+    interceptor.hook((request) => {
+      request.timeout = 1200;
+      return request;
+    });
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/data');
+    xhr.send();
+
+    await new Promise((resolve) => {
+      xhr.onload = () => resolve(undefined);
+      xhr.onerror = () => resolve(undefined);
+    });
+
+    expect(xhr.timeout).toBe(1200);
+  });
 });
 
 describe('业务场景 - POST 请求带 body', () => {

@@ -18,6 +18,7 @@ export interface FetchResponse
   blob: Blob;
   formData: FormData;
   json: any;
+  mockError?: Error | string;
 }
 
 export interface AjaxResponse
