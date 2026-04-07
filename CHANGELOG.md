@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.3.1 (2026-04-07)
+
+### 🇺🇸 English
+
+- fix: Support XHR instance method overrides ([fb8c174](https://github.com/Arktomson/ajaxInterceptor/commit/fb8c174)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- fix: 兼容XHR实例方法重写 ([fb8c174](https://github.com/Arktomson/ajaxInterceptor/commit/fb8c174)) [@arktomson](https://github.com/arktomson)
+
 ## 1.3.0 (2026-03-28)
 
 ### 🇺🇸 English
