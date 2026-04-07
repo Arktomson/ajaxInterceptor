@@ -8,6 +8,8 @@ import {
   resolveUrl,
 } from './utils';
 
+type XhrMethodOverrideName = 'open' | 'send' | 'setRequestHeader';
+
 export class XhrInterceptor {
   // ---- public 属性 ----
   public readonly nativeXhr = window.XMLHttpRequest;
@@ -25,6 +27,10 @@ export class XhrInterceptor {
     Record<'UNSENT' | 'OPENED' | 'HEADERS_RECEIVED' | 'LOADING' | 'DONE', number>
   >;
   private xhrResponseEvents = ['readystatechange', 'load', 'loadend'];
+  private xhrAssignedMethodOverrides = new WeakMap<
+    XMLHttpRequest,
+    Partial<Record<XhrMethodOverrideName, unknown>>
+  >();
   private xhrInstanceAttr = [
     'response',
     'responseText',
@@ -284,11 +290,32 @@ export class XhrInterceptor {
     };
     return toSortedString(a) === toSortedString(b);
   }
+  private getAssignedMethodOverride(target: XMLHttpRequest, attr: string) {
+    return this.xhrAssignedMethodOverrides.get(target)?.[
+      attr as XhrMethodOverrideName
+    ];
+  }
+  private setAssignedMethodOverride(
+    target: XMLHttpRequest,
+    attr: string,
+    value: unknown,
+  ) {
+    let targetOverrides = this.xhrAssignedMethodOverrides.get(target);
+    if (!targetOverrides) {
+      targetOverrides = {};
+      this.xhrAssignedMethodOverrides.set(target, targetOverrides);
+    }
+    targetOverrides[attr as XhrMethodOverrideName] = value;
+  }
   private getCaptureOption(options?: boolean | AddEventListenerOptions | EventListenerOptions) {
     if (typeof options === 'boolean') return options;
     return !!options?.capture;
   }
   private getAttrHandler(target: XMLHttpRequest, attr: string, receiver?: any) {
+    const assignedMethodOverride = this.getAssignedMethodOverride(target, attr);
+    if (assignedMethodOverride !== undefined) {
+      return assignedMethodOverride;
+    }
     if (this.xhrInstanceAttr.includes(attr)) {
       return this.xhrInstanceAttrHandler[attr](target);
     }
@@ -311,6 +338,9 @@ export class XhrInterceptor {
           );
         },
         set(target: XMLHttpRequest, prop: string, value, receiver) {
+          if (self.xhrMethodsHandler[prop]) {
+            self.setAssignedMethodOverride(target, prop, value);
+          }
           if (typeof value === 'function' && prop.startsWith('on')) {
             const isResponseEvent = self.xhrResponseEvents.includes(
               prop.replace(/^on/, ''),
