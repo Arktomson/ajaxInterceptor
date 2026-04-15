@@ -1,5 +1,15 @@
 # ajax-hooker
 
+## 1.3.2 (2026-04-15)
+
+### 🇺🇸 English
+
+- fix: Resolve URL with document.baseURI ([5377194](https://github.com/Arktomson/ajaxInterceptor/commit/5377194)) [@arktomson](https://github.com/arktomson)
+
+### 🇨🇳 简体中文
+
+- fix: 使用 document.baseURI 解析 URL ([5377194](https://github.com/Arktomson/ajaxInterceptor/commit/5377194)) [@arktomson](https://github.com/arktomson)
+
 ## 1.3.1 (2026-04-07)
 
 ### 🇺🇸 English
